@@ -394,6 +394,22 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .transport .tempo{margin-left:auto}
 .d1top{align-items:flex-start}
 @media (max-width:480px){.secedit .sn{font-stretch:100%;font-size:1.05rem;letter-spacing:.02em}.secedit{padding:9px 10px}}
+
+/* latching keys */
+.keys{display:flex;gap:6px;flex-wrap:wrap}
+.keyb{position:relative;min-width:44px;height:44px;padding:15px 9px 5px;border:none;border-radius:3px;font-family:var(--silkface);font-weight:700;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;
+  background:linear-gradient(180deg,#4b4743,#36332f);color:var(--silk);box-shadow:0 0 0 1px #141210,0 3px 0 #141210,inset 0 1px 0 rgba(255,255,255,.12)}
+.keyb:active{transform:translateY(2px);box-shadow:0 0 0 1px #141210,0 1px 0 #141210}
+.keyb .kl{position:absolute;top:5px;left:50%;margin-left:-4px;width:8px;height:8px;border-radius:50%;background:var(--led-off);box-shadow:inset 0 1px 1px rgba(0,0,0,.8)}
+.keyb.on .kl{background:radial-gradient(circle at 40% 35%,#ffe2a8,#ff9a16 45%,#b55a00);box-shadow:0 0 7px 2px rgba(255,150,20,.55)}
+.deck1 .keyb{background:linear-gradient(180deg,#f0e9d6,#d6ccb3);color:var(--ink);box-shadow:0 0 0 1px #7d725d,0 4px 0 #8d826a,0 5px 0 #3a342b,inset 0 1px 0 #fff}
+.deck1 .keyb:active{transform:translateY(3px);box-shadow:0 0 0 1px #7d725d,0 1px 0 #8d826a,0 2px 0 #3a342b}
+.deck1 .keyb .kl{box-shadow:inset 0 1px 1px rgba(0,0,0,.8),0 0 0 1.5px #3a342b}
+.keyb.toggle{align-self:flex-end}
+.deck1 .opts .ctl,.loopctl .ctl:not(.kctl){flex:0 1 auto;max-width:none;min-width:0}
+.mix{border-top:none;padding-top:4px;grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
+@media (max-width:620px){.knobbank,.mix{grid-template-columns:repeat(4,1fr)}.kctl{width:auto;max-width:84px}}
+@media (min-width:621px){.knobbank,.mix{grid-template-columns:repeat(8,1fr)}}
 </style>
 
 <div class="wrap">
@@ -724,7 +740,8 @@ let pats={a:blank(),b:blank()}, editing='a', mute=ROWS.map(()=>false), solo=ROWS
 let bpm=100, swing=0.5, hum=0.4, mode='trade', barsEach=4, varA=0.5, varB=0.3, fills=true, clickMode='off', clickVol=0.6, countIn=true;
 const $=id=>document.getElementById(id);
 const store={get(){try{return JSON.parse(localStorage.getItem('tumbao2'))}catch(e){return null}},set(v){try{localStorage.setItem('tumbao2',JSON.stringify(v))}catch(e){}}};
-function save(){store.set({pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
+let masterVol=0.8,lv=Object.fromEntries(ROWS.map(r=>[r.id,1]));
+function save(){store.set({vol:masterVol,ghost:GHOST,lv,pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
 
 /* ---------- grid UI ---------- */
 const cells=[];
@@ -798,7 +815,26 @@ function makeKnobs(){document.querySelectorAll('.ctl input[type=range]').forEach
   k.addEventListener('dblclick',()=>set(+def));
   k.addEventListener('wheel',e=>{e.preventDefault();set(+inp.value-Math.sign(e.deltaY)*step*Math.max(1,Math.round((max-min)/60)))},{passive:false});
   knobs.push({inp,cap,min,max,last:null})});}
-function knobLoop(){for(const kb of knobs){if(kb.inp.value!==kb.last){kb.last=kb.inp.value;const f=(+kb.inp.value-kb.min)/(kb.max-kb.min||1);kb.cap.style.setProperty('--a',(-135+f*270)+'deg')}}requestAnimationFrame(knobLoop)}
+function knobLoop(){syncKeys();for(const kb of knobs){if(kb.inp.value!==kb.last){kb.last=kb.inp.value;const f=(+kb.inp.value-kb.min)/(kb.max-kb.min||1);kb.cap.style.setProperty('--a',(-135+f*270)+'deg')}}requestAnimationFrame(knobLoop)}
+
+/* ---------- latching keys in place of menus and checkboxes ---------- */
+const keyed=[];
+function makeKeys(){
+  const SHORT={click:{off:'Off',all:'Always',solo:'Solo',eighths:'8ths'},lpWhere:{a:'Groove',b:'Solo',both:'Both'},recMode:{groove:'Groove',free:'Mic only'}};
+  ['bars','click','lpBars','lpWhere','recMode'].forEach(id=>{const sel=$(id);if(!sel)return;const row=document.createElement('div');row.className='keys';row.setAttribute('role','radiogroup');
+    const lab=sel.closest('.ctl')&&sel.closest('.ctl').querySelector('label');if(lab)row.setAttribute('aria-label',lab.textContent.trim());
+    [...sel.options].forEach(o=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=o.value;b.setAttribute('role','radio');
+      b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=(SHORT[id]&&SHORT[id][o.value])||o.text.replace(/ bars?$/,'');
+      b.setAttribute('aria-label',o.text);b.onclick=()=>{if(sel.value!==o.value){sel.value=o.value;sel.dispatchEvent(new Event('change',{bubbles:true}))}};row.append(b)});
+    sel.hidden=true;sel.after(row);keyed.push({sel,row,last:null})});
+  [['fills','Fills'],['countin','Count-in'],['lpDuck','Mute pads']].forEach(([id,t])=>{const cb=$(id);if(!cb)return;const lab=cb.closest('label');
+    const b=document.createElement('button');b.type='button';b.className='keyb toggle';b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=t;
+    b.setAttribute('aria-label',lab?lab.textContent.trim():t);b.onclick=()=>{cb.checked=!cb.checked;cb.dispatchEvent(new Event('change',{bubbles:true}))};
+    lab.replaceWith(b);b.after(cb);cb.hidden=true;keyed.push({cb,btn:b,last:null})});
+}
+function syncKeys(){for(const k of keyed){if(k.sel){const v=k.sel.value;if(v===k.last)continue;k.last=v;
+    k.row.querySelectorAll('.keyb').forEach(b=>{const on=b.dataset.v===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)})}
+  else{const v=k.cb.checked;if(v===k.last)continue;k.last=v;k.btn.classList.toggle('on',v);k.btn.setAttribute('aria-pressed',v)}}}
 
 /* ---------- arrangement ---------- */
 function cycleLen(){return mode==='trade'?barsEach*2:barsEach}
@@ -832,7 +868,7 @@ function ensureAudio(){
   unlockIOS();
   if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();ctx.onstatechange=setStatus;
     const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=4;
-    master=ctx.createGain();master.gain.value=0.8;master.connect(comp);comp.connect(ctx.destination);out=master;
+    master=ctx.createGain();master.gain.value=masterVol;master.connect(comp);comp.connect(ctx.destination);out=master;
     noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
   if(ctx.state!=='running')ctx.resume().catch(()=>{});
   try{const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0)}catch(e){}
@@ -875,11 +911,11 @@ function click(t,accent){if(clickVol<=0)return;const o=osc('sine',t,0.05),g=gain
   env(g,t,(accent?0.9:0.55)*clickVol,0.03);o.connect(g).connect(master)}
 function clickOn(sec){return clickMode==='all'||clickMode==='eighths'||(clickMode==='solo'&&sec==='b')}
 /* one hit at a given velocity, routed through its own gain */
-function hit(id,t,vel){const g=gain();g.gain.value=vel;g.connect(master);const prev=out;out=g;voice(id,t);out=prev}
+function hit(id,t,vel){const g=gain();g.gain.value=vel*(lv[id]??1);g.connect(master);const prev=out;out=g;voice(id,t);out=prev}
 
 /* ---------- humanize: per-voice lean (ms at 100%) + random drift ---------- */
 const LEAN={kick:7,snare:20,clap:18,chat:-9,ohat:-6,clave:0,conga:4,tumba:6};
-const GHOST=0.32;
+let GHOST=0.32;
 const rnd=()=>(Math.random()+Math.random()-1); // soft bell curve, -1..1
 function feel(id,step){
   const ms=(LEAN[id]+rnd()*11)*hum;
@@ -1341,11 +1377,16 @@ function takeSlot(){const i=pendingSlot;pendingSlot=-1;if(slots[i]){applySnap(sl
 /* ---------- wire up ---------- */
 (function relayout(){const tr=document.querySelector('.transport');tr.append($('tempoWin').closest('.tempo'));
   const bank=document.createElement('div');bank.className='knobbank';
-  ['bpm','swing','hum','varA','varB','clickVol'].forEach(id=>bank.append($(id).closest('.ctl')));tr.after(bank);
+  const mk=(id,label,min,max,val)=>{const c=document.createElement('div');c.className='ctl';c.innerHTML=`<label for="${id}">${label} <b id="${id}v">${val}%</b></label><input type="range" id="${id}" min="${min}" max="${max}" value="${val}">`;return c};
+  ['bpm','swing','hum','varA','varB'].forEach(id=>bank.append($(id).closest('.ctl')));bank.append(mk('ghost','Ghost level',10,70,32));
+  bank.append($('clickVol').closest('.ctl'));bank.append(mk('vol','Volume',0,100,80));tr.after(bank);
+  const mixh=document.createElement('div');mixh.className='bankhead';mixh.innerHTML='<span class="lbl">Levels</span>';
+  const mix=document.createElement('div');mix.className='knobbank mix';ROWS.forEach(r=>mix.append(mk('lv_'+r.id,r.name,0,150,100)));
+  $('kitrows').before(mixh,mix);
   const arrs=[...document.querySelectorAll('.deck1 .arr')],opts=arrs[0];opts.classList.add('opts');
   [$('click').closest('.ctl'),$('fills').closest('label'),$('countin').closest('label')].forEach(e=>opts.append(e));
   arrs.slice(1).forEach(a=>a.remove())})();
-buildGrid();makeKnobs();knobLoop();
+buildGrid();makeKnobs();makeKeys();knobLoop();
 const saved=store.get();
 if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length===ROWS.length){
   pats=saved.pats;mute=saved.mute||mute;setBpm(saved.bpm||100);setSwing(Math.round((saved.swing||0.5)*100));
@@ -1399,6 +1440,12 @@ function setClickVol(pct){clickVol=pct/100;$('clickVol').value=pct;$('clickVolv'
 $('click').onchange=e=>{clickMode=e.target.value;save()};
 $('clickVol').oninput=e=>{setClickVol(+e.target.value);save()};
 $('countin').onchange=e=>{countIn=e.target.checked;save()};
+function setPct(id,v){$(id).value=v;$(id+'v').textContent=Math.round(v)+'%'}
+$('vol').oninput=e=>{masterVol=+e.target.value/100;$('volv').textContent=e.target.value+'%';if(master)master.gain.value=masterVol;save()};
+$('ghost').oninput=e=>{GHOST=+e.target.value/100;$('ghostv').textContent=e.target.value+'%';save()};
+ROWS.forEach(r=>{$('lv_'+r.id).oninput=e=>{lv[r.id]=+e.target.value/100;$('lv_'+r.id+'v').textContent=e.target.value+'%';save()}});
+if(saved){if(saved.vol!=null){masterVol=saved.vol;setPct('vol',masterVol*100)}if(saved.ghost!=null){GHOST=saved.ghost;setPct('ghost',GHOST*100)}
+  if(saved.lv)ROWS.forEach(r=>{if(saved.lv[r.id]!=null){lv[r.id]=saved.lv[r.id];setPct('lv_'+r.id,lv[r.id]*100)}})}
 function paintMode(){const a=mode!=='b',b=mode!=='a';$('playA').setAttribute('aria-pressed',a);$('playB').setAttribute('aria-pressed',b);
   $('playA').setAttribute('aria-label',a?'Groove plays. Tap to skip it':'Groove is off. Tap to play it');$('playB').setAttribute('aria-label',b?'Solo bed plays. Tap to skip it':'Solo bed is off. Tap to play it');
   $('playA').querySelector('.pl').textContent=a?'Plays':'Off';$('playB').querySelector('.pl').textContent=b?'Plays':'Off'}
