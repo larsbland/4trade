@@ -90,7 +90,7 @@ select,.btn{font:inherit;font-size:.78rem;font-weight:600;letter-spacing:.04em;p
 /* favorites bank */
 .bank{display:flex;flex-direction:column;gap:8px}
 .bankhead{display:flex;justify-content:space-between;align-items:center;gap:8px}
-#storeBtn[aria-pressed="true"],#lpStore[aria-pressed="true"]{color:var(--led-r);background:#5a1e18;box-shadow:inset 0 1px 2px #000,0 0 8px rgba(255,74,58,.45);animation:blink .7s steps(2) infinite}
+#storeBtn[aria-pressed="true"],#lpStore[aria-pressed="true"],#kitStore[aria-pressed="true"]{color:var(--led-r);background:#5a1e18;box-shadow:inset 0 1px 2px #000,0 0 8px rgba(255,74,58,.45);animation:blink .7s steps(2) infinite}
 .slots{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 @media (max-width:600px){.slots{grid-template-columns:repeat(4,1fr)}}
 .slot{position:relative;min-width:0;text-align:left;border:1px solid var(--edge);border-radius:5px;padding:7px 7px 6px;display:flex;flex-direction:column;gap:2px;
@@ -140,6 +140,13 @@ select,.btn{font:inherit;font-size:.78rem;font-weight:600;letter-spacing:.04em;p
 .krow.loopsel{grid-template-columns:36px minmax(0,1fr) 36px}
 .krow.loopsel .ksel{padding:7px 10px}
 .krow.loopsel .ks{font-size:.82rem}
+.kitfavs{display:flex;flex-direction:column;gap:8px}
+.kitname{display:flex;gap:8px}
+#kitName{flex:1;min-width:0;font:inherit;font-family:var(--mono);font-size:.82rem;padding:8px 10px;border-radius:5px;border:1px solid var(--edge);background:#141516;color:var(--led-g);box-shadow:inset 0 1px 2px #000}
+#kitName::placeholder{color:var(--silk-dim)}
+.kitslots{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+@media (max-width:560px){.kitslots{grid-template-columns:repeat(3,1fr)}}
+.kitfavs.armed .slot{outline:1px dashed var(--led-r);outline-offset:1px}
 .lpfavs{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:stretch}
 .lpslots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;min-width:0}
 .slot .b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -309,6 +316,10 @@ label.btn{display:inline-block;cursor:pointer}
         <div class="libinfo"><span id="libinfo"></span><button class="btn" id="libClear" hidden>Clear kit library</button></div>
         <div class="libmsg" id="libmsg" aria-live="polite"></div>
         <div class="kitrows" id="kitrows"></div>
+        <div class="kitfavs" id="kitFavs">
+          <div class="kitname"><input type="text" id="kitName" maxlength="30" placeholder="Name this kit" aria-label="Kit name" autocomplete="off"><button class="btn" id="kitStore" aria-pressed="false">Store kit</button></div>
+          <div class="kitslots" id="kitSlots"></div>
+        </div>
       </div>
 
       <div class="subsec" id="loopSec">
@@ -867,7 +878,7 @@ async function assign(rowId,id){
 }
 function stepRow(rowId,dir){const l=rowList(rowId);if(!l.length)return;const i=l.findIndex(m=>m.id===kit[rowId]);
   let j=i+dir;if(j<-1)j=l.length-1;if(j>=l.length)j=-1;assign(rowId,j<0?null:l[j].id)}
-function renderKit(){const el=$('kitrows');el.innerHTML='';
+function renderKit(){const el=$('kitrows');el.innerHTML='';try{setTimeout(renderKitSlots,0)}catch(e){}
   ROWS.forEach(r=>{const m=kit[r.id]&&libById.get(kit[r.id]),l=rowList(r.id),idx=m?l.indexOf(m):-1,cat=ROWCAT[r.id];
     const row=document.createElement('div');row.className='krow'+(m?'':' synth')+(browserRow===r.id?' open':'');row.style.setProperty('--c',`var(--${r.id})`);
     row.innerHTML='<button class="kname"></button><button class="kstep" data-d="-1">◀</button><button class="ksel"><span class="ks"></span><span class="kc"></span></button><button class="kstep" data-d="1">▶</button>';
@@ -945,6 +956,30 @@ async function lpSlotTap(i){
   Object.assign(loop,{id:sn.id,bars:sn.bars,bpm:sn.bpm,dur:sn.dur||b.duration,on:true});save();renderLoop();updateSel();
   if(!playing)preview(b)}
 (function(){const v=lpStore.get();if(Array.isArray(v))lpSlots=v.concat([null,null,null,null]).slice(0,4)})();
+
+/* kit favorites: save and recall just the sounds */
+let kitSlots=Array(6).fill(null),kitArmed=false;
+const kitSlotStore={get(){try{return JSON.parse(localStorage.getItem('4trade_kitslots'))}catch(e){return null}},set(v){try{localStorage.setItem('4trade_kitslots',JSON.stringify(v))}catch(e){}}};
+const kitKey=k=>JSON.stringify(Object.keys(k).sort().map(x=>[x,k[x]]));
+function renderKitSlots(){const el=$('kitSlots');if(!el)return;el.innerHTML='';$('kitFavs').classList.toggle('armed',kitArmed);const cur=kitKey(kit);
+  kitSlots.forEach((sn,i)=>{const b=document.createElement('button');
+    b.className='slot'+(sn?'':' empty')+(sn&&kitKey(sn.kit)===cur&&Object.keys(kit).length?' active':'');
+    b.innerHTML='<span class="n"></span><span class="t"></span><span class="b"></span>';b.querySelector('.n').prepend('K'+(i+1));
+    const n=sn?Object.keys(sn.kit).length:0,miss=sn?Object.values(sn.kit).filter(id=>!libById.has(id)).length:0;
+    b.querySelector('.t').textContent=sn?sn.name:'empty';
+    b.querySelector('.b').textContent=sn?(miss?`${miss} missing`:`${n} sound${n===1?'':'s'}`):' ';
+    b.setAttribute('aria-label',sn?`Kit ${i+1}: ${sn.name}`:`Kit ${i+1}: empty`);b.onclick=()=>kitSlotTap(i);el.append(b)})}
+async function kitSlotTap(i){
+  if(kitArmed){if(!Object.keys(kit).length){setLibMsg('Load some samples onto the rows first, then store the kit.');return}
+    const name=$('kitName').value.trim()||`Kit ${i+1}`;kitSlots[i]={name,kit:clone(kit)};$('kitName').value=name;
+    kitArmed=false;$('kitStore').setAttribute('aria-pressed','false');kitSlotStore.set(kitSlots);renderKitSlots();setLibMsg(`Stored ${name} in K${i+1}.`);return}
+  const sn=kitSlots[i];if(!sn)return;
+  kit={};Object.entries(sn.kit).forEach(([r,id])=>{if(libById.has(id))kit[r]=id});
+  const miss=Object.keys(sn.kit).length-Object.keys(kit).length;
+  $('kitName').value=sn.name;save();renderKit();updateSel();
+  setLibMsg(miss?`${sn.name} loaded. ${miss} sound${miss===1?' isn’t':'s aren’t'} in the library on this device, so ${miss===1?'that row uses':'those rows use'} the synth.`:`${sn.name} loaded.`);
+  await ensureAudio();await loadKitBuffers();if(!playing)hit('kick',ctx.currentTime+0.01,1)}
+(function(){const v=kitSlotStore.get();if(Array.isArray(v))kitSlots=v.concat(Array(6).fill(null)).slice(0,6)})();
 
 /* browser */
 let browserRow=null,bCat='all',bQuery='';
@@ -1107,6 +1142,7 @@ loadTakes();
 renderLoop();
 $('lpPrev').onclick=()=>stepLoop(-1);$('lpNext').onclick=()=>stepLoop(1);
 $('lpSel').onclick=()=>browserRow==='loop'?closeBrowser():openBrowser('loop');
+$('kitStore').onclick=()=>{kitArmed=!kitArmed;$('kitStore').setAttribute('aria-pressed',kitArmed);renderKitSlots()};
 $('lpStore').onclick=()=>{lpArmed=!lpArmed;$('lpStore').setAttribute('aria-pressed',lpArmed);renderLpSlots()};
 $('lpOn').onclick=()=>{loop.on=!loop.on;save();renderLoop()};
 $('lpBars').onchange=e=>{loop.bars=+e.target.value;if(loop.dur)loop.bpm=240*loop.bars/loop.dur;save();renderLoop()};
