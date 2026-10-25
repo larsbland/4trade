@@ -410,6 +410,14 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .mix{border-top:none;padding-top:4px;grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
 @media (max-width:620px){.knobbank,.mix{grid-template-columns:repeat(4,1fr)}.kctl{width:auto;max-width:84px}}
 @media (min-width:621px){.knobbank,.mix{grid-template-columns:repeat(8,1fr)}}
+
+.mixer{gap:10px}
+.mixer .knobbank{border-top:none;padding-top:2px}
+#fxVoice .keyb{min-width:0;flex:1 1 60px;font-size:.72rem;padding:15px 4px 5px}
+#fxVoice .keyb::after{content:"";position:absolute;left:6px;right:6px;bottom:4px;height:3px;border-radius:1px;background:var(--c);opacity:.85}
+.fxk{grid-template-columns:repeat(4,1fr)!important}
+@media (min-width:621px){.fxk{grid-template-columns:repeat(8,1fr)!important}}
+.kctl.off{opacity:.35;pointer-events:none}
 </style>
 
 <div class="wrap">
@@ -741,7 +749,7 @@ let bpm=100, swing=0.5, hum=0.4, mode='trade', barsEach=4, varA=0.5, varB=0.3, f
 const $=id=>document.getElementById(id);
 const store={get(){try{return JSON.parse(localStorage.getItem('tumbao2'))}catch(e){return null}},set(v){try{localStorage.setItem('tumbao2',JSON.stringify(v))}catch(e){}}};
 let masterVol=0.8,lv=Object.fromEntries(ROWS.map(r=>[r.id,1]));
-function save(){store.set({vol:masterVol,ghost:GHOST,lv,pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
+function save(){store.set({vol:masterVol,ghost:GHOST,lv,fx,pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
 
 /* ---------- grid UI ---------- */
 const cells=[];
@@ -869,7 +877,7 @@ function ensureAudio(){
   if(!ctx){ctx=new (window.AudioContext||window.webkitAudioContext)();ctx.onstatechange=setStatus;
     const comp=ctx.createDynamicsCompressor();comp.threshold.value=-10;comp.ratio.value=4;
     master=ctx.createGain();master.gain.value=masterVol;master.connect(comp);comp.connect(ctx.destination);out=master;
-    noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}
+    noiseBuf=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;buildChannels()}
   if(ctx.state!=='running')ctx.resume().catch(()=>{});
   try{const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0)}catch(e){}
   setStatus();
@@ -911,7 +919,47 @@ function click(t,accent){if(clickVol<=0)return;const o=osc('sine',t,0.05),g=gain
   env(g,t,(accent?0.9:0.55)*clickVol,0.03);o.connect(g).connect(master)}
 function clickOn(sec){return clickMode==='all'||clickMode==='eighths'||(clickMode==='solo'&&sec==='b')}
 /* one hit at a given velocity, routed through its own gain */
-function hit(id,t,vel){const g=gain();g.gain.value=vel*(lv[id]??1);g.connect(master);const prev=out;out=g;voice(id,t);out=prev}
+function hit(id,t,vel){const g=gain();g.gain.value=vel*(lv[id]??1);g.connect(chan[id]?chan[id].in:master);
+  if(id==='kick'&&fx.kick.sub>0){const o=ctx.createOscillator(),sg=gain();o.type='sine';o.frequency.setValueAtTime(64,t);o.frequency.exponentialRampToValueAtTime(43,t+0.14);
+    sg.gain.setValueAtTime(0.0001,t);sg.gain.exponentialRampToValueAtTime(Math.max(0.0002,fx.kick.sub*1.2),t+0.005);sg.gain.exponentialRampToValueAtTime(0.0001,t+0.45);
+    o.connect(sg).connect(g);o.start(t);o.stop(t+0.5)}const prev=out;out=g;voice(id,t);out=prev}
+
+/* ---------- per-voice channel: drive → filter → pan, with a room send ---------- */
+const fx=Object.fromEntries(ROWS.map(r=>[r.id,{pan:0,tone:0,drive:0,room:0,sub:0}]));
+let chan={},roomIn=null,fxSel='kick';
+function buildChannels(){
+  const len=Math.floor(ctx.sampleRate*1.6),ir=ctx.createBuffer(2,len,ctx.sampleRate);
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++){const t=i/ctx.sampleRate;d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.2)*(t<0.012?t/0.012:1)}}
+  const conv=ctx.createConvolver();conv.buffer=ir;const ret=gain();ret.gain.value=0.6;const damp=ctx.createBiquadFilter();damp.type='lowpass';damp.frequency.value=5200;
+  roomIn=gain();roomIn.connect(conv);conv.connect(damp);damp.connect(ret);ret.connect(master);
+  ROWS.forEach(r=>{const c={in:gain(),pre:gain(),sh:ctx.createWaveShaper(),post:gain(),hp:ctx.createBiquadFilter(),lp:ctx.createBiquadFilter(),
+      pan:ctx.createStereoPanner?ctx.createStereoPanner():null,send:gain()};
+    c.sh.oversample='2x';c.hp.type='highpass';c.lp.type='lowpass';c.hp.Q.value=0.7;c.lp.Q.value=0.7;
+    c.in.connect(c.pre);c.pre.connect(c.sh);c.sh.connect(c.post);c.post.connect(c.hp);c.hp.connect(c.lp);
+    const last=c.pan||c.lp;if(c.pan)c.lp.connect(c.pan);last.connect(master);last.connect(c.send);c.send.connect(roomIn);
+    chan[r.id]=c;applyFx(r.id)})}
+const curves={};
+function driveCurve(a){const k=Math.round(a*100);if(curves[k])return curves[k];const n=1024,c=new Float32Array(n),g=1+a*18;
+  for(let i=0;i<n;i++){const x=i/(n-1)*2-1;c[i]=Math.tanh(g*x)/Math.tanh(g)}return curves[k]=c}
+function applyFx(id){const c=chan[id],f=fx[id];if(!c)return;const t=ctx.currentTime;
+  if(c.pan)c.pan.pan.setTargetAtTime(f.pan,t,0.02);
+  c.lp.frequency.setTargetAtTime(f.tone<0?20000*Math.pow(500/20000,-f.tone):20000,t,0.02);
+  c.hp.frequency.setTargetAtTime(f.tone>0?20*Math.pow(1500/20,f.tone):20,t,0.02);
+  c.sh.curve=f.drive>0.01?driveCurve(f.drive):null;c.pre.gain.setTargetAtTime(1+f.drive*1.5,t,0.02);c.post.gain.setTargetAtTime(1/(1+f.drive*1.3),t,0.02);
+  c.send.gain.setTargetAtTime(f.room*0.9,t,0.02)}
+const panTxt=v=>v===0?'C':(v<0?'L':'R')+Math.abs(v),toneTxt=v=>v===0?'Flat':(v<0?'Low-pass ':'High-pass ')+Math.abs(v);
+function paintFxKnobs(){const f=fx[fxSel];
+  $('fxTone').value=Math.round(f.tone*100);$('fxTonev').textContent=toneTxt(Math.round(f.tone*100));
+  $('fxDrive').value=Math.round(f.drive*100);$('fxDrivev').textContent=Math.round(f.drive*100)+'%';
+  $('fxRoom').value=Math.round(f.room*100);$('fxRoomv').textContent=Math.round(f.room*100)+'%';
+  $('fxSub').value=Math.round(fx.kick.sub*100);$('fxSubv').textContent=Math.round(fx.kick.sub*100)+'%';
+  $('fxSub').closest('.kctl').classList.toggle('off',fxSel!=='kick');if(fxSel!=='kick')$('fxSubv').textContent='Kick only';
+  document.querySelectorAll('#fxVoice .keyb').forEach(b=>{const on=b.dataset.v===fxSel;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)})}
+function selectFxVoice(id){fxSel=id;paintFxKnobs()}
+function paintMix(){ROWS.forEach(r=>{$('pan_'+r.id).value=Math.round(fx[r.id].pan*100);$('pan_'+r.id+'v').textContent=panTxt(Math.round(fx[r.id].pan*100));
+  $('lv_'+r.id).value=Math.round((lv[r.id]??1)*100);$('lv_'+r.id+'v').textContent=Math.round((lv[r.id]??1)*100)+'%'});paintFxKnobs()}
+function loadMix(m){if(!m)return;if(m.lv)ROWS.forEach(r=>{if(m.lv[r.id]!=null)lv[r.id]=m.lv[r.id]});
+  if(m.fx)ROWS.forEach(r=>{if(m.fx[r.id])Object.assign(fx[r.id],m.fx[r.id])});ROWS.forEach(r=>applyFx(r.id));paintMix()}
 
 /* ---------- humanize: per-voice lean (ms at 100%) + random drift ---------- */
 const LEAN={kick:7,snare:20,clap:18,chat:-9,ohat:-6,clave:0,conga:4,tumba:6};
@@ -1224,10 +1272,10 @@ function renderKitSlots(){const el=$('kitSlots');if(!el)return;el.innerHTML='';$
     b.setAttribute('aria-label',sn?`Kit ${i+1}: ${sn.name}`:`Kit ${i+1}: empty`);b.onclick=()=>kitSlotTap(i);el.append(b)})}
 async function kitSlotTap(i){
   if(kitArmed){if(!Object.keys(kit).length){setLibMsg('Load some samples onto the rows first, then store the kit.');return}
-    const name=$('kitName').value.trim()||`Kit ${i+1}`;kitSlots[i]={name,kit:clone(kit)};$('kitName').value=name;
+    const name=$('kitName').value.trim()||`Kit ${i+1}`;kitSlots[i]={name,kit:clone(kit),mix:{lv:clone(lv),fx:clone(fx)}};$('kitName').value=name;
     kitArmed=false;$('kitStore').setAttribute('aria-pressed','false');kitSlotStore.set(kitSlots);renderKitSlots();setLibMsg(`Stored ${name} in K${i+1}.`);return}
   const sn=kitSlots[i];if(!sn)return;
-  kit={};Object.entries(sn.kit).forEach(([r,id])=>{if(libById.has(id))kit[r]=id});
+  kit={};Object.entries(sn.kit).forEach(([r,id])=>{if(libById.has(id))kit[r]=id});if(sn.mix){loadMix(sn.mix)}
   const miss=Object.keys(sn.kit).length-Object.keys(kit).length;
   $('kitName').value=sn.name;save();renderKit();updateSel();
   setLibMsg(miss?`${sn.name} loaded. ${miss} sound${miss===1?' isn’t':'s aren’t'} in the library on this device, so ${miss===1?'that row uses':'those rows use'} the synth.`:`${sn.name} loaded.`);
@@ -1380,9 +1428,17 @@ function takeSlot(){const i=pendingSlot;pendingSlot=-1;if(slots[i]){applySnap(sl
   const mk=(id,label,min,max,val)=>{const c=document.createElement('div');c.className='ctl';c.innerHTML=`<label for="${id}">${label} <b id="${id}v">${val}%</b></label><input type="range" id="${id}" min="${min}" max="${max}" value="${val}">`;return c};
   ['bpm','swing','hum','varA','varB'].forEach(id=>bank.append($(id).closest('.ctl')));bank.append(mk('ghost','Ghost level',10,70,32));
   bank.append($('clickVol').closest('.ctl'));bank.append(mk('vol','Volume',0,100,80));tr.after(bank);
-  const mixh=document.createElement('div');mixh.className='bankhead';mixh.innerHTML='<span class="lbl">Levels</span>';
+  const mixer=document.createElement('div');mixer.className='subsec mixer';mixer.id='mixer';
+  const head=t=>{const h=document.createElement('div');h.className='bankhead';h.innerHTML=`<span class="lbl">${t}</span>`;return h};
   const mix=document.createElement('div');mix.className='knobbank mix';ROWS.forEach(r=>mix.append(mk('lv_'+r.id,r.name,0,150,100)));
-  $('kitrows').before(mixh,mix);
+  const pans=document.createElement('div');pans.className='knobbank mix pans';ROWS.forEach(r=>pans.append(mk('pan_'+r.id,r.name,-100,100,0)));
+  const vk=document.createElement('div');vk.className='keys';vk.id='fxVoice';vk.setAttribute('role','radiogroup');vk.setAttribute('aria-label','Voice to edit');
+  ROWS.forEach(r=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=r.id;b.setAttribute('role','radio');b.style.setProperty('--c',`var(--${r.id})`);
+    b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=r.name.replace('Open hat','O.hat');b.onclick=()=>selectFxVoice(r.id);vk.append(b)});
+  const fxb=document.createElement('div');fxb.className='knobbank fxk';
+  fxb.append(mk('fxTone','Filter',-100,100,0),mk('fxDrive','Drive',0,100,0),mk('fxRoom','Room',0,100,0),mk('fxSub','Sub bass',0,100,0));
+  mixer.append(head('Mixer · level'),mix,head('Pan'),pans,head('Voice FX'),vk,fxb);
+  document.querySelector('.ruler').after(mixer);
   const arrs=[...document.querySelectorAll('.deck1 .arr')],opts=arrs[0];opts.classList.add('opts');
   [$('click').closest('.ctl'),$('fills').closest('label'),$('countin').closest('label')].forEach(e=>opts.append(e));
   arrs.slice(1).forEach(a=>a.remove())})();
@@ -1443,9 +1499,16 @@ $('countin').onchange=e=>{countIn=e.target.checked;save()};
 function setPct(id,v){$(id).value=v;$(id+'v').textContent=Math.round(v)+'%'}
 $('vol').oninput=e=>{masterVol=+e.target.value/100;$('volv').textContent=e.target.value+'%';if(master)master.gain.value=masterVol;save()};
 $('ghost').oninput=e=>{GHOST=+e.target.value/100;$('ghostv').textContent=e.target.value+'%';save()};
-ROWS.forEach(r=>{$('lv_'+r.id).oninput=e=>{lv[r.id]=+e.target.value/100;$('lv_'+r.id+'v').textContent=e.target.value+'%';save()}});
+ROWS.forEach(r=>{$('lv_'+r.id).oninput=e=>{lv[r.id]=+e.target.value/100;$('lv_'+r.id+'v').textContent=e.target.value+'%';save()};
+  $('pan_'+r.id).oninput=e=>{fx[r.id].pan=+e.target.value/100;$('pan_'+r.id+'v').textContent=panTxt(+e.target.value);applyFx(r.id);save()}});
+$('fxTone').oninput=e=>{fx[fxSel].tone=+e.target.value/100;$('fxTonev').textContent=toneTxt(+e.target.value);applyFx(fxSel);save()};
+$('fxDrive').oninput=e=>{fx[fxSel].drive=+e.target.value/100;$('fxDrivev').textContent=e.target.value+'%';applyFx(fxSel);save()};
+$('fxRoom').oninput=e=>{fx[fxSel].room=+e.target.value/100;$('fxRoomv').textContent=e.target.value+'%';applyFx(fxSel);save()};
+$('fxSub').oninput=e=>{fx.kick.sub=+e.target.value/100;$('fxSubv').textContent=e.target.value+'%';save()};
 if(saved){if(saved.vol!=null){masterVol=saved.vol;setPct('vol',masterVol*100)}if(saved.ghost!=null){GHOST=saved.ghost;setPct('ghost',GHOST*100)}
-  if(saved.lv)ROWS.forEach(r=>{if(saved.lv[r.id]!=null){lv[r.id]=saved.lv[r.id];setPct('lv_'+r.id,lv[r.id]*100)}})}
+  if(saved.lv)ROWS.forEach(r=>{if(saved.lv[r.id]!=null){lv[r.id]=saved.lv[r.id];setPct('lv_'+r.id,lv[r.id]*100)}})
+  if(saved.fx)loadMix({fx:saved.fx})}
+paintMix();
 function paintMode(){const a=mode!=='b',b=mode!=='a';$('playA').setAttribute('aria-pressed',a);$('playB').setAttribute('aria-pressed',b);
   $('playA').setAttribute('aria-label',a?'Groove plays. Tap to skip it':'Groove is off. Tap to play it');$('playB').setAttribute('aria-label',b?'Solo bed plays. Tap to skip it':'Solo bed is off. Tap to play it');
   $('playA').querySelector('.pl').textContent=a?'Plays':'Off';$('playB').querySelector('.pl').textContent=b?'Plays':'Off'}
