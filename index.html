@@ -597,7 +597,7 @@ function silentWav(){const sr=8000,n=sr/2,b=new Uint8Array(44+n),v=new DataView(
   w(0,'RIFF');v.setUint32(4,36+n,true);w(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr,true);v.setUint16(32,1,true);v.setUint16(34,8,true);w(36,'data');v.setUint32(40,n,true);b.fill(128,44);
   let s='';b.forEach(x=>s+=String.fromCharCode(x));return 'data:audio/wav;base64,'+btoa(s)}
 function unlockIOS(){
-  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
+  try{if(navigator.audioSession)navigator.audioSession.type=(typeof mic!=='undefined'&&mic)?'play-and-record':'playback'}catch(e){}
   try{if(!unlockEl){unlockEl=document.createElement('audio');unlockEl.setAttribute('playsinline','');unlockEl.loop=true;unlockEl.src=silentWav()}unlockEl.play().catch(()=>{})}catch(e){}
 }
 function setStatus(){$('status').textContent=ctx?('Audio: '+ctx.state):'Audio: off. Tap Play to start.'}
@@ -986,8 +986,9 @@ async function micOn(){
   if(mic)return true;
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){recMsg(framed?'The mic doesn’t work inside Claude. Open your standalone 4TRADE in Safari or Chrome to record.':'This browser has no microphone access.');return false}
   await ensureAudio();
+  try{if(navigator.audioSession)navigator.audioSession.type='play-and-record'}catch(e){}
   try{mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1}})}
-  catch(e){mic=null;recMsg(framed?'The mic doesn’t work inside Claude. Open your standalone 4TRADE in Safari or Chrome to record.':
+  catch(e){mic=null;try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(err){}recMsg(framed?'The mic doesn’t work inside Claude. Open your standalone 4TRADE in Safari or Chrome to record.':
     (e&&e.name==='NotAllowedError'?'Microphone access was blocked. Allow the mic for this site in your browser settings, then tap Mic again.':'Couldn’t open the microphone: '+(e&&e.message||'unknown error')));return false}
   micSrc=ctx.createMediaStreamSource(mic);micGain=gain();micGain.gain.value=+$('recGain').value/100;
   micAn=ctx.createAnalyser();micAn.fftSize=1024;micSrc.connect(micGain);micGain.connect(micAn);
@@ -998,7 +999,7 @@ async function micOn(){
     rec.chunks.push(q);rec.n+=d.length;if(rec.n/ctx.sampleRate>900)finishRec()};
   $('micBtn').setAttribute('aria-pressed','true');$('micBtn').textContent='Mic on';recMsg('');meterLoop();return true}
 function micOff(){if(rec)finishRec();try{mic&&mic.getTracks().forEach(t=>t.stop())}catch(e){}try{micSrc&&micSrc.disconnect();capNode&&capNode.disconnect()}catch(e){}
-  mic=micSrc=capNode=micAn=null;$('micBtn').setAttribute('aria-pressed','false');$('micBtn').textContent='Mic off';$('meterFill').style.width='0'}
+  mic=micSrc=capNode=micAn=null;try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}$('micBtn').setAttribute('aria-pressed','false');$('micBtn').textContent='Mic off';$('meterFill').style.width='0'}
 function meterLoop(){if(!micAn)return;const a=new Float32Array(micAn.fftSize);micAn.getFloatTimeDomainData(a);let pk=0;for(const v of a)pk=Math.max(pk,Math.abs(v));
   const db=20*Math.log10(pk||1e-6),w=Math.max(0,Math.min(1,(db+48)/48));$('meterFill').style.width=(w*100).toFixed(1)+'%';
   if(pk>=0.98)clipT=performance.now();$('clipLed').classList.toggle('on',performance.now()-clipT<1200);
