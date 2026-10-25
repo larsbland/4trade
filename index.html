@@ -59,8 +59,8 @@ select,.btn{font:inherit;font-size:.78rem;font-weight:600;letter-spacing:.04em;p
 .btn{background:linear-gradient(180deg,var(--rubber-hi),var(--rubber));box-shadow:0 2px 0 var(--edge);text-transform:uppercase;font-size:.72rem;letter-spacing:.1em}
 .btn:active{transform:translateY(1px);box-shadow:0 1px 0 var(--edge)}
 
-.arr{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:14px;align-items:end;padding-top:14px;border-top:1px solid rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
-@media (max-width:560px){.arr{grid-template-columns:1fr 1fr}.arr .feel{grid-column:1/-1}}
+.arr{display:grid;grid-template-columns:1fr 2fr;gap:14px;align-items:end;padding-top:14px;border-top:1px solid rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
+@media (max-width:560px){.arr{grid-template-columns:1fr 1.6fr}}
 .arr select{width:100%}
 .arr.vary{grid-template-columns:1fr 1fr auto}
 @media (max-width:560px){.arr.vary{grid-template-columns:1fr 1fr}.arr.vary .chk{grid-column:1/-1}}
@@ -109,6 +109,24 @@ select,.btn{font:inherit;font-size:.78rem;font-weight:600;letter-spacing:.04em;p
 #patName{flex:1 1 160px;min-width:0;font:inherit;font-size:.86rem;font-weight:600;padding:8px 10px;border-radius:5px;border:1px solid var(--edge);background:#141516;color:var(--led-g);box-shadow:inset 0 1px 2px #000;font-family:var(--mono)}
 #patName::placeholder{color:var(--silk-dim);font-weight:400}
 #newPat.armed{color:var(--led-r);background:#5a1e18;box-shadow:inset 0 1px 2px #000,0 0 8px rgba(255,74,58,.45)}
+/* section tiles: tap the name to edit, tap the light to play it */
+.secs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sec{display:grid;grid-template-columns:minmax(0,1fr) 64px;border:1px solid var(--edge);border-radius:7px;overflow:hidden;box-shadow:0 3px 0 var(--edge);background:linear-gradient(180deg,var(--rubber-hi),var(--rubber))}
+.secedit{border:none;background:none;text-align:left;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.secedit .sn{font-family:var(--display);font-style:italic;font-weight:900;font-size:1.35rem;line-height:1;color:var(--silk-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.secedit .ss{font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--silk-dim)}
+.secedit[aria-pressed="true"]{background:var(--rubber);box-shadow:inset 0 3px 5px rgba(0,0,0,.55)}
+.secedit[aria-pressed="true"] .sn{color:var(--silk)}
+.secedit[aria-pressed="true"] .ss{color:var(--led-g)}
+.secplay{border:none;border-left:1px solid var(--edge);background:rgba(0,0,0,.18);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px 4px}
+.secplay .led{width:16px;height:16px;border-radius:50%;background:var(--led-off);box-shadow:inset 0 -2px 3px rgba(0,0,0,.5)}
+.secplay .pl{font-size:.56rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--silk-dim)}
+.secplay[aria-pressed="true"] .led{background:var(--led-g);box-shadow:0 0 10px var(--led-g)}
+.sec.solo .secplay[aria-pressed="true"] .led{background:var(--led-r);box-shadow:0 0 10px var(--led-r)}
+.secplay[aria-pressed="true"] .pl{color:var(--silk)}
+.sec.live{border-color:var(--led-g);box-shadow:0 3px 0 var(--edge),0 0 0 1px var(--led-g)}
+.sec.solo.live{border-color:var(--led-r);box-shadow:0 3px 0 var(--edge),0 0 0 1px var(--led-r)}
+@media (max-width:420px){.sec{grid-template-columns:minmax(0,1fr) 54px}.secedit .sn{font-size:1.15rem}}
 /* pads */
 .grid{display:flex;flex-direction:column;gap:6px;padding-top:14px;border-top:1px solid rgba(0,0,0,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.07)}
 .trk{display:grid;grid-template-columns:66px 1fr;gap:6px;align-items:center}
@@ -245,8 +263,6 @@ label.btn{display:inline-block;cursor:pointer}
     </div>
 
     <div class="arr">
-      <div class="ctl"><label for="mode">Arrangement</label>
-        <select id="mode"><option value="trade">Trade: groove → solo</option><option value="a">Groove only</option><option value="b">Solo bed only</option></select></div>
       <div class="ctl"><label for="bars">Bars each</label>
         <select id="bars"><option>1</option><option>2</option><option selected>4</option><option>8</option></select></div>
       <div class="ctl feel"><label for="hum">Humanize <b id="humv">40%</b></label>
@@ -283,10 +299,6 @@ label.btn{display:inline-block;cursor:pointer}
     </div>
 
     <div class="edit">
-      <div class="tabs" role="tablist" aria-label="Pattern to edit">
-        <button class="tab" role="tab" id="tabA" aria-selected="true">Groove</button>
-        <button class="tab" role="tab" id="tabB" aria-selected="false">Solo bed</button>
-      </div>
       <select id="preset" aria-label="Pattern preset">
         <option value="custom">Custom pattern</option>
         <optgroup label="Rock"><option value="rock8">Straight 8s</option><option value="drive">Driving rock</option><option value="halftime">Half-time</option><option value="garage">Garage rock</option><option value="levee">Heavy shuffle stomp</option><option value="motorik">Motorik drive</option><option value="train">Train beat</option><option value="tomrock">Tom-tom stomp</option></optgroup>
@@ -302,6 +314,17 @@ label.btn{display:inline-block;cursor:pointer}
       </select>
       <button class="btn" id="copy">Copy groove → bed</button>
       <button class="btn" id="clear">Clear</button>
+    </div>
+
+    <div class="secs" role="group" aria-label="Sections">
+      <div class="sec" id="secA">
+        <button class="secedit" id="tabA" aria-pressed="true"><span class="sn">Groove</span><span class="ss" id="tabAs">Editing</span></button>
+        <button class="secplay" id="playA" aria-pressed="true"><span class="led"></span><span class="pl">Plays</span></button>
+      </div>
+      <div class="sec solo" id="secB">
+        <button class="secedit" id="tabB" aria-pressed="false"><span class="sn">Solo</span><span class="ss" id="tabBs">Tap to edit</span></button>
+        <button class="secplay" id="playB" aria-pressed="true"><span class="led"></span><span class="pl">Plays</span></button>
+      </div>
     </div>
 
     <div class="grid" id="grid"></div>
@@ -571,7 +594,7 @@ function buildGrid(){
 }
 function paintCell(i,k){const v=pats[editing][i][k];cells[i][k].classList.toggle('on',v>0);cells[i][k].classList.toggle('ghost',v===2);cells[i][k].setAttribute('aria-label',`${ROWS[i].name} step ${k+1}: ${v===2?'ghost':v?'on':'off'}`)}
 function paintAll(){ROWS.forEach((r,i)=>{for(let k=0;k<16;k++)paintCell(i,k);document.querySelector(`.trk[data-row="${i}"]`).classList.toggle('muted',mute[i])})}
-function setEditing(s){editing=s;$('tabA').setAttribute('aria-selected',s==='a');$('tabB').setAttribute('aria-selected',s==='b');paintAll();updateOffsec();clearMarks()}
+function setEditing(s){editing=s;$('tabA').setAttribute('aria-pressed',s==='a');$('tabB').setAttribute('aria-pressed',s==='b');$('tabAs').textContent=s==='a'?'Editing':'Tap to edit';$('tabBs').textContent=s==='b'?'Editing':'Tap to edit';paintAll();updateOffsec();clearMarks()}
 let lit=-1,playingSec='a';
 function light(step){if(lit>=0)cells.forEach(r=>r[lit].classList.remove('now'));lit=step;if(step>=0)cells.forEach(r=>r[step].classList.add('now'))}
 function updateOffsec(){$('grid').classList.toggle('offsec',playing&&playingSec!==editing)}
@@ -591,7 +614,7 @@ function buildPips(){const el=$('pips');el.innerHTML='';
   for(let i=0;i<cycleLen();i++){const p=document.createElement('div');p.className='pip'+(sectionFor(i)==='b'?' b':'');el.append(p)}}
 function showBar(bar,step){
   const pos=bar%cycleLen(),sec=sectionFor(bar),within=(pos%barsEach)+1;
-  playingSec=sec;updateOffsec();
+  playingSec=sec;updateOffsec();$('secA').classList.toggle('live',sec==='a');$('secB').classList.toggle('live',sec==='b');
   const st=$('stage');st.classList.toggle('solo',sec==='b'&&mode==='trade');
   const nextSec=sectionFor(bar+1),warn=mode==='trade'&&nextSec!==sec&&step>=8;
   st.classList.toggle('warn',warn);
@@ -599,7 +622,7 @@ function showBar(bar,step){
   $('barinfo').textContent=warn?(nextSec==='b'?'solo next bar':'groove back next bar'):`bar ${within} of ${barsEach}`;
   [...$('pips').children].forEach((p,i)=>p.classList.toggle('now',i===pos));
 }
-function resetStage(){const st=$('stage');st.classList.remove('solo','warn');$('secname').textContent=mode==='b'?'Solo bed':'Groove';$('barinfo').textContent='stopped';
+function resetStage(){$('secA').classList.remove('live');$('secB').classList.remove('live');const st=$('stage');st.classList.remove('solo','warn');$('secname').textContent=mode==='b'?'Solo bed':'Groove';$('barinfo').textContent='stopped';
   [...$('pips').children].forEach(p=>p.classList.remove('now'))}
 
 /* ---------- audio ---------- */
@@ -1127,7 +1150,7 @@ const saved=store.get();
 if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length===ROWS.length){
   pats=saved.pats;mute=saved.mute||mute;setBpm(saved.bpm||100);setSwing(Math.round((saved.swing||0.5)*100));
   setHum(Math.round((saved.hum??0.4)*100));mode=saved.mode||'trade';barsEach=saved.barsEach||4;
-  $('mode').value=mode;$('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
+  $('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
 else loadPreset('son');
 buildPips();resetStage();renderSlots();renderLibInfo();renderKit();refreshLib();
 [['fFiles','kit'],['fDir','kit'],['lpFiles','loop'],['lpDir','loop']].forEach(([id,kind])=>{$(id).onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)importFiles(f,kind)}});
@@ -1176,7 +1199,12 @@ function setClickVol(pct){clickVol=pct/100;$('clickVol').value=pct;$('clickVolv'
 $('click').onchange=e=>{clickMode=e.target.value;save()};
 $('clickVol').oninput=e=>{setClickVol(+e.target.value);save()};
 $('countin').onchange=e=>{countIn=e.target.checked;save()};
-$('mode').onchange=e=>{mode=e.target.value;buildPips();if(!playing)resetStage();save()};
+function paintMode(){const a=mode!=='b',b=mode!=='a';$('playA').setAttribute('aria-pressed',a);$('playB').setAttribute('aria-pressed',b);
+  $('playA').setAttribute('aria-label',a?'Groove plays. Tap to skip it':'Groove is off. Tap to play it');$('playB').setAttribute('aria-label',b?'Solo bed plays. Tap to skip it':'Solo bed is off. Tap to play it');
+  $('playA').querySelector('.pl').textContent=a?'Plays':'Off';$('playB').querySelector('.pl').textContent=b?'Plays':'Off'}
+function toggleSec(sec){let a=mode!=='b',b=mode!=='a';if(sec==='a')a=!a;else b=!b;if(!a&&!b){if(sec==='a')b=true;else a=true}
+  mode=a&&b?'trade':a?'a':'b';paintMode();buildPips();if(!playing)resetStage();save()}
+$('playA').onclick=()=>toggleSec('a');$('playB').onclick=()=>toggleSec('b');paintMode();
 $('bars').onchange=e=>{barsEach=+e.target.value;buildPips();if(!playing)resetStage();save()};
 $('tabA').onclick=()=>setEditing('a');$('tabB').onclick=()=>setEditing('b');
 $('preset').onchange=e=>{if(e.target.value!=='custom')loadPreset(e.target.value)};
