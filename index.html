@@ -1185,19 +1185,27 @@ const folderOf=m=>{const p=m.path.split('/');return p.length>1?p[p.length-2]:'Lo
 
 /* import: zip, folder, loose files or drag and drop */
 const junk=p=>/(^|\/)__MACOSX\//.test(p)||/(^|\/)\._/.test(p)||/(^|\/)\.DS_Store$/.test(p);
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let importCancel=false;
+const withTimeout=(p,ms)=>Promise.race([p,new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),ms))]);
+function showStop(kind,on){const b=$(kind==='loop'?'lpStop':'kitStop');if(b)b.hidden=!on}
 async function importItems(items,kind){
-  if(importing){setLibMsg('Another import is still running. Try again when it finishes.',kind);return}importing=true;
+  if(importing){setLibMsg('Another import is still running. Tap Stop import, or wait for it to finish.',kind);return}importing=true;importCancel=false;showStop(kind,true);
+  try{await importRun(items,kind)}finally{importing=false;showStop(kind,false)}}
+async function importRun(items,kind){
   const known=new Set(libById.keys());let audio=items.filter(it=>!junk(it.path)&&AUDIO_RE.test(it.path));
   let skipped=items.length-audio.length,other=0;
   const isLoop=it=>classify(it.path)==='loop';
   if(kind==='kit'){const n=audio.length;audio=audio.filter(it=>!isLoop(it));other=n-audio.length}
   else{const ls=audio.filter(isLoop);if(ls.length){other=audio.length-ls.length;audio=ls}}
-  let added=0,dup=0,batch=[],stopped='';
+  let added=0,dup=0,batch=[],stopped='',unread=0;
   try{
     for(let i=0;i<audio.length;i++){
-      if(i%10===0)setLibMsg(`Importing ${fmt(i+1)} of ${fmt(audio.length)}…`,kind);
+      if(importCancel){stopped=' Import stopped.';break}
+      if(i%5===0){setLibMsg(`Importing ${fmt(i+1)} of ${fmt(audio.length)}…`,kind);await new Promise(r=>setTimeout(r,0))}
       const it=audio[i];if(it.size>MAXBYTES){skipped++;continue}
-      const buf=await it.get();if(!buf||buf.byteLength>MAXBYTES){skipped++;continue}
+      let buf=null;try{buf=await withTimeout(it.get(),20000)}catch(e){unread++;continue}
+      if(!buf||buf.byteLength>MAXBYTES){skipped++;continue}
       const id=kind+':'+it.path+'|'+buf.byteLength;if(known.has(id)){dup++;continue}known.add(id);
       const cat=kind==='loop'?'loop':classify(it.path);
       batch.push({meta:{id,kind,path:it.path,name:it.path.split('/').pop().replace(/\.[^.]+$/,''),cat,size:buf.byteLength},buf});added++;
@@ -1205,21 +1213,22 @@ async function importItems(items,kind){
     }
     if(batch.length)await libPut(batch);
   }catch(e){stopped=(e&&e.name==='QuotaExceededError')?' Your device ran out of room for samples, so the import stopped there.':' The import stopped early: '+(e&&e.message||'unknown error')+'.'}
-  importing=false;try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   await refreshLib();if(added&&kind==='kit')autoAssign();
   const what=kind==='loop'?'loop':'one-shot';
   setLibMsg(`Added ${fmt(added)} ${what}${added===1?'':'s'}.`+(dup?` ${fmt(dup)} already in the library.`:'')
     +(other?(kind==='kit'?` Left out ${fmt(other)} loop${other===1?'':'s'}. Import ${other===1?'it':'them'} in the Loop player.`:` Left out ${fmt(other)} one-shot${other===1?'':'s'}. Import ${other===1?'it':'them'} in the Kit.`):'')
-    +(skipped?` Skipped ${fmt(skipped)} that weren’t audio or were too big.`:'')+stopped
+    +(skipped?` Skipped ${fmt(skipped)} that weren’t audio or were too big.`:'')
+    +(unread?` Couldn’t read ${fmt(unread)} file${unread===1?'':'s'}. If they’re in iCloud Drive, download them first (tap the cloud icon in Files) or import the .zip.`:'')+stopped
     +(added?(kind==='kit'?' Use ◀ ▶ on each row to audition them in the groove.':' Use ◀ ▶ to try them in the groove.'):''),kind);
 }
 async function importFiles(files,kind){
   const zips=files.filter(f=>/\.zip$/i.test(f.name)),items=files.filter(f=>!/\.zip$/i.test(f.name)).map(f=>({path:f.webkitRelativePath||f.relPath||f.name,size:f.size,get:()=>f.arrayBuffer()}));
   for(const z of zips){setLibMsg(`Opening ${z.name}…`,kind);
-    try{if(!window.JSZip)throw new Error('zip');const zip=await JSZip.loadAsync(z);
+    try{if(!window.JSZip)throw new Error('zip');const zip=await withTimeout(JSZip.loadAsync(z),90000);
       zip.forEach((path,e)=>{if(!e.dir)items.push({path,size:0,get:()=>e.async('arraybuffer')})})}
-    catch(e){setLibMsg(`Couldn’t open ${z.name}. If it’s very large, unzip it in the Files app, then use Folder or select the files.`,kind);if(!items.length)return}}
-  if(!items.length){setLibMsg('No audio files found there.',kind);return}
+    catch(e){setLibMsg(`Couldn’t open ${z.name}. If it’s very large, unzip it in the Files app, open the unzipped folder in the picker, tap Select and choose the sounds.`,kind);if(!items.length)return}}
+  if(!items.length){setLibMsg(files.length?'No audio files found there.':(IOS?'Nothing came through. On iPad, pick the .zip, or open the folder in the picker, tap Select and choose the sounds.':'Nothing came through. Try selecting the files or the .zip instead.'),kind);return}
   await importItems(items,kind);
 }
 async function dropToFiles(dt){const entries=[...dt.items].map(it=>it.webkitGetAsEntry&&it.webkitGetAsEntry()).filter(Boolean);
@@ -1538,7 +1547,10 @@ if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length===ROWS.length){
   $('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
 else loadPreset('son');
 buildPips();resetStage();renderSlots();renderLibInfo();renderKit();refreshLib();
-[['fFiles','kit'],['fDir','kit'],['lpFiles','loop'],['lpDir','loop']].forEach(([id,kind])=>{$(id).onchange=e=>{const f=[...e.target.files];e.target.value='';if(f.length)importFiles(f,kind)}});
+[['libmsg','kitStop','kit'],['lpMsg','lpStop','loop']].forEach(([m,id])=>{const b=document.createElement('button');b.type='button';b.className='btn';b.id=id;b.textContent='Stop import';b.hidden=true;b.onclick=()=>{importCancel=true};$(m).after(b)});
+if(IOS){document.querySelectorAll('label[for="fDir"],label[for="lpDir"]').forEach(l=>l.hidden=true);
+  document.querySelector('label[for="fFiles"]').textContent='Import zip or sounds';document.querySelector('label[for="lpFiles"]').textContent='Import zip or loops'}
+[['fFiles','kit'],['fDir','kit'],['lpFiles','loop'],['lpDir','loop']].forEach(([id,kind])=>{$(id).onchange=e=>{const f=[...e.target.files];e.target.value='';importFiles(f,kind).catch(err=>setLibMsg('Import failed: '+(err&&err.message||'unknown error')+'. Try the .zip or select the sounds directly.',kind))}});
 $('bClose').onclick=closeBrowser;
 $('micBtn').onclick=()=>mic?micOff():micOn();
 $('recBtn').onclick=()=>rec?(rec.withGroove&&playing?stop():finishRec()):startRec();
