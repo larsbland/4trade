@@ -16,7 +16,7 @@
   --chassis:#1b1a18; --plate:#2d2b29; --plate-hi:#3a3835; --well:#1f1d1b; --rubber:#3b3834; --rubber-hi:#4b4743;
   --silk:#ece4d0; --silk-dim:#a59b86; --edge:#141210; --led-g:#ff9a16; --led-r:#ff4a2e; --led-off:#4a2a08;
   --cream:#e9e2cf; --cream-2:#d6ccb3; --ink:#2b2622; --ink-dim:#6d6252;
-  --kick:#c8452e; --snare:#df8a2a; --clap:#d8bd3c; --chat:#8fae6a; --ohat:#6fa3a6; --clave:#a58fc0; --conga:#b0754a; --tumba:#86532f;
+  --kick:#c8452e; --snare:#df8a2a; --clap:#d8bd3c; --chat:#8fae6a; --ohat:#6fa3a6; --clave:#a58fc0; --conga:#b0754a; --tumba:#86532f; --shaker:#c9a76a;
   --display:"Archivo", "Helvetica Neue", Arial, sans-serif;
   --silkface:"Barlow Condensed", "Helvetica Neue Condensed", "Arial Narrow", sans-serif;
   --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -409,7 +409,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .deck1 .opts .ctl,.loopctl .ctl:not(.kctl){flex:0 1 auto;max-width:none;min-width:0}
 .mix{border-top:none;padding-top:4px;grid-template-columns:repeat(auto-fill,minmax(76px,1fr))}
 @media (max-width:620px){.knobbank,.mix{grid-template-columns:repeat(4,1fr)}.kctl{width:auto;max-width:84px}}
-@media (min-width:621px){.knobbank,.mix{grid-template-columns:repeat(8,1fr)}}
+@media (min-width:621px){.knobbank{grid-template-columns:repeat(8,1fr)}.mix{grid-template-columns:repeat(9,1fr)}}
 
 .mixer{gap:10px}
 .mixer .knobbank{border-top:none;padding-top:2px}
@@ -681,7 +681,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 <script>
 const ROWS=[
  {id:'kick',name:'Kick'},{id:'snare',name:'Snare'},{id:'clap',name:'Clap'},{id:'chat',name:'Hat'},
- {id:'ohat',name:'Open hat'},{id:'clave',name:'Clave'},{id:'conga',name:'Conga'},{id:'tumba',name:'Tumba'}];
+ {id:'ohat',name:'Open hat'},{id:'clave',name:'Clave'},{id:'conga',name:'Conga'},{id:'tumba',name:'Tumba'},{id:'shaker',name:'Shaker'}];
 const P=(...a)=>{const r=Array(16).fill(0);a.forEach(i=>r[i]=1);return r};
 const PG=(on,gh)=>{const r=P(...on);gh.forEach(i=>r[i]=2);return r}; // 1 = hit, 2 = ghost
 const H8=()=>P(0,2,4,6,8,10,12,14), HQ=()=>P(0,4,8,12);
@@ -704,8 +704,8 @@ const PRESETS={
  dancehall:{bpm:96,swing:50,hum:20,a:{kick:P(0,3,8,11),snare:P(4,12),clap:P(7,15),chat:H8(),clave:P(6,14)},b:{kick:P(0,8),clap:P(15)}},
  nyabinghi:{bpm:76,swing:50,hum:40,a:{kick:PG([0],[8]),tumba:P(0,8),conga:P(2,6,10,14),clave:P(3,7,10,11,15)},b:{kick:PG([0],[8]),conga:P(2,6,10,14)}},
  tonyallen:{bpm:116,swing:52,hum:40,a:{kick:P(0,3,10,13),snare:PG([4,12],[6,7,9,15]),chat:PG([0,2,4,6,8,10,12],[3,7,11]),ohat:P(14),clave:P(0,2,5,7,10,12),conga:P(3,6,11,14),tumba:P(7,15)},b:{kick:P(0,10),clave:P(0,2,5,7,10,12),chat:H8()}},
- amapiano:{bpm:112,swing:54,hum:30,a:{kick:P(0,8),clap:P(4,12),chat:P(2,6,10,14),clave:PG([2,6,10,14],[0,1,3,4,5,7,8,9,11,12,13,15]),conga:P(3,6,11,13),tumba:P(0,10)},b:{kick:P(0,8),clave:PG([2,6,10,14],[0,1,3,4,5,7,8,9,11,12,13,15]),tumba:P(0,10)}},
- afrohouse:{bpm:122,swing:50,hum:25,a:{kick:P(0,4,8,12),clap:P(4,12),chat:P(2,6,10,14),conga:P(2,3,6,10,11,13),tumba:P(0,8,9),clave:P(3,11)},b:{kick:P(0,4,8,12),conga:P(3,6,11,14)}},
+ amapiano:{bpm:112,swing:54,hum:30,a:{kick:P(0,8),clap:P(4,12),chat:P(2,6,10,14),shaker:PG([2,6,10,14],[0,1,3,4,5,7,8,9,11,12,13,15]),conga:P(3,6,11,13),tumba:P(0,10)},b:{kick:P(0,8),shaker:PG([2,6,10,14],[0,1,3,4,5,7,8,9,11,12,13,15]),tumba:P(0,10)}},
+ afrohouse:{bpm:122,swing:50,hum:25,a:{shaker:PG([0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]),kick:P(0,4,8,12),clap:P(4,12),chat:P(2,6,10,14),conga:P(2,3,6,10,11,13),tumba:P(0,8,9),clave:P(3,11)},b:{kick:P(0,4,8,12),conga:P(3,6,11,14)}},
  lagos:{bpm:104,swing:62,hum:40,a:{kick:P(0,6,11),snare:PG([4,12],[2,9,14]),chat:H8(),clave:P(0,3,6,8,11,14),conga:P(7,15),tumba:P(10)},b:{kick:P(0,11),clave:P(0,3,6,8,11,14)}},
  drummer:{bpm:100,swing:56,hum:35,a:{kick:P(0,2,10,13),snare:PG([4,12],[7,9,11,15]),chat:P(0,2,4,8,10,12,14),ohat:P(6)},b:{kick:P(0,10),snare:P(12),chat:HQ()}},
  secondline:{bpm:98,swing:62,hum:45,a:{kick:P(0,3,8,11),snare:PG([4,7,12],[2,9,10,14]),chat:HQ()},b:{kick:P(0,3,8,11),snare:P(12)}},
@@ -722,11 +722,11 @@ const PRESETS={
  donut:{bpm:94,swing:62,hum:80,a:{kick:P(0,7,9,14),clap:P(4,12),snare:PG([],[11,15]),chat:P(0,2,4,6,8,10,12),ohat:P(14)},b:{kick:P(0,9),clap:P(12)}},
  stumble:{bpm:84,swing:58,hum:90,a:{kick:P(0,2,9,11,15),snare:PG([4,12],[7]),chat:PG([0,2,4,6,8,10,12,14],[5,13])},b:{kick:P(0,11),snare:P(12)}},
  slum:{bpm:90,swing:66,hum:75,a:{kick:P(0,6,7,10),snare:PG([4,12],[14,15]),chat:P(0,2,4,6,8,12,14),ohat:P(10)},b:{kick:P(0,10),snare:P(12),chat:HQ()}},
- guaguanco:{bpm:104,swing:50,hum:40,a:{clave:P(0,3,7,10,12),conga:PG([6,7,14,15],[0,2,3,4,8,10,12]),tumba:P(11,12)},b:{clave:P(0,3,7,10,12),tumba:P(12)}},
+ guaguanco:{bpm:104,swing:50,hum:40,a:{shaker:PG([0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]),clave:P(0,3,7,10,12),conga:PG([6,7,14,15],[0,2,3,4,8,10,12]),tumba:P(11,12)},b:{clave:P(0,3,7,10,12),tumba:P(12)}},
  songo:{bpm:112,swing:50,hum:35,a:{kick:P(7,15),snare:PG([3,10],[1,5,6,13]),clave:P(0,3,6,10,12),conga:P(6,7,14,15),tumba:P(10,11),chat:HQ()},b:{kick:P(7,15),clave:P(0,3,6,10,12),conga:P(6,7,14,15)}},
  chacha:{bpm:116,swing:50,hum:30,a:{kick:P(8),clave:P(0,4,8,12),chat:H8(),conga:P(6,7,14,15),tumba:P(12)},b:{clave:P(0,4,8,12),conga:P(6,7,14,15),tumba:P(12)}},
- bossa:{bpm:132,swing:50,hum:25,a:{kick:P(0,3,4,7,8,11,12,15),clave:P(0,3,6,10,13),chat:H8()},b:{kick:P(0,3,4,7,8,11,12,15),clave:P(0,3,6,10,13)}},
- samba:{bpm:100,swing:52,hum:30,a:{tumba:P(4,12),conga:P(0,3,7,8,11,15),snare:PG([2,6,10,14],[1,5,9,13]),chat:H16()},b:{tumba:P(4,12),chat:H16()}},
+ bossa:{shaker:PG([0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]),bpm:132,swing:50,hum:25,a:{kick:P(0,3,4,7,8,11,12,15),clave:P(0,3,6,10,13),chat:H8()},b:{kick:P(0,3,4,7,8,11,12,15),clave:P(0,3,6,10,13)}},
+ samba:{shaker:PG([0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]),bpm:100,swing:52,hum:30,a:{tumba:P(4,12),conga:P(0,3,7,8,11,15),snare:PG([2,6,10,14],[1,5,9,13]),chat:H16()},b:{tumba:P(4,12),chat:H16()}},
  /* rock */
  rock8:{bpm:120,swing:50,hum:20,
    a:{kick:P(0,8,10),snare:P(4,12),chat:H8()},
@@ -813,7 +813,7 @@ const PRESETS={
    b:{kick:P(0,10),snare:P(12),chat:HQ()}},
  /* latin + originals */
  son:{bpm:100,swing:50,hum:35,
-   a:{kick:P(0,6,8,14),chat:P(0,2,4,6,8,10,12,14),clave:P(0,3,6,10,12),conga:P(6,7,14,15),tumba:P(10)},
+   a:{shaker:PG([0,2,4,6,8,10,12,14],[1,3,5,7,9,11,13,15]),kick:P(0,6,8,14),chat:P(0,2,4,6,8,10,12,14),clave:P(0,3,6,10,12),conga:P(6,7,14,15),tumba:P(10)},
    b:{kick:P(0,8),chat:P(0,4,8,12),clave:P(0,3,6,10,12)}},
  rumba:{bpm:108,swing:54,hum:40,
    a:{clave:P(0,3,7,10,12),conga:P(2,6,7,14,15),tumba:P(11,12),chat:P(0,4,8,12)},
@@ -829,6 +829,7 @@ const PRESETS={
    b:{kick:P(0,4,8,12),chat:P(2,6,10,14)}}};
 
 const blank=()=>ROWS.map(()=>Array(16).fill(0));
+const normPats=p=>({a:ROWS.map((r,i)=>(p.a&&p.a[i]||Array(16).fill(0)).slice()),b:ROWS.map((r,i)=>(p.b&&p.b[i]||Array(16).fill(0)).slice())});
 let pats={a:blank(),b:blank()}, editing='a', mute=ROWS.map(()=>false), solo=ROWS.map(()=>false);
 let bpm=100, swing=0.5, hum=0.4, mode='trade', barsEach=4, varA=0.5, varB=0.3, fills=true, clickMode='off', clickVol=0.6, countIn=true;
 const $=id=>document.getElementById(id);
@@ -985,8 +986,25 @@ function drum(t,f0,f1,bend,dec,peak,slap){
   const o2=osc('sine',t,dec);o2.frequency.setValueAtTime(f0*1.5,t);const g2=gain();env(g2,t,peak*0.18,dec*0.5);o2.connect(g2).connect(out);
   const n=noise(t,0.03),nf=filt('bandpass',slap,1.2),ng=gain();env(ng,t,peak*0.5,0.02);n.connect(nf).connect(ng).connect(out);
 }
+/* shakers & friends: grains of band-passed noise, plus a gourd tone for the shekere */
+const SYN={shaker:'Shaker',shakerLong:'Long shaker',shekere:'Shekere',shekereBass:'Shekere bass',cabasa:'Cabasa',maraca:'Maraca'};
+function grain(t,f,q,peak,att,dec,type='bandpass'){const n=noise(t,att+dec+0.02),b=filt(type,f,q),g=gain();env(g,t,peak,dec,att);n.connect(b).connect(g).connect(out)}
+function synthPerc(k,t){const j=()=>Math.random()*0.004;
+  switch(k){
+  case 'shaker':grain(t,6800,1.2,0.42,0.006,0.055);grain(t+0.012+j(),8200,1.5,0.18,0.004,0.03);break;
+  case 'shakerLong':grain(t,5200,0.9,0.36,0.028,0.13);grain(t+0.05,7600,1.4,0.16,0.01,0.05);break;
+  case 'shekere':{[0,0.007,0.015,0.026].forEach((d,i)=>grain(t+d+j(),4200+i*700,2.2,0.34-i*0.06,0.002,0.03));
+    const o=osc('sine',t,0.18),g=gain();o.frequency.setValueAtTime(240,t);o.frequency.exponentialRampToValueAtTime(190,t+0.08);env(g,t,0.16,0.12);o.connect(g).connect(out);break}
+  case 'shekereBass':{const o=osc('sine',t,0.4),g=gain();o.frequency.setValueAtTime(130,t);o.frequency.exponentialRampToValueAtTime(92,t+0.12);env(g,t,0.8,0.3);o.connect(g).connect(out);
+    grain(t,900,0.8,0.25,0.002,0.04,'lowpass');[0.01,0.02,0.032].forEach((d,i)=>grain(t+d+j(),5000+i*600,2,0.16,0.002,0.025));break}
+  case 'cabasa':grain(t,7200,7,0.5,0.012,0.08);grain(t,10500,1,0.12,0.012,0.06,'highpass');break;
+  case 'maraca':grain(t,7400,1.6,0.38,0.003,0.03);grain(t+0.014+j(),7000,1.6,0.3,0.003,0.03);break;
+  }}
+const SYNMETA=Object.entries(SYN).map(([k,n])=>({id:'syn:'+k,name:n,cat:'syn',path:'Built-in/'+n,kind:'kit'}));
 function voice(id,t){
   if(id==='chat'&&openHat){openHat.gain.cancelScheduledValues(t);openHat.gain.setTargetAtTime(0.0001,t,0.008);openHat=null}
+  if(kit[id]&&kit[id].startsWith('syn:')){synthPerc(kit[id].slice(4),t);return}
+  if(id==='shaker'&&!kit[id]){synthPerc('shaker',t);return}
   const sb=kit[id]&&bufs.get(kit[id]);
   if(sb){const s=ctx.createBufferSource(),g=gain();s.buffer=sb;g.gain.setValueAtTime(1,t);s.connect(g).connect(out);s.start(t);if(id==='ohat')openHat=g;return}
   switch(id){
@@ -1053,7 +1071,7 @@ function loadMix(m){if(!m)return;if(m.lv)ROWS.forEach(r=>{if(m.lv[r.id]!=null)lv
   if(m.fx)ROWS.forEach(r=>{if(m.fx[r.id])Object.assign(fx[r.id],m.fx[r.id])});ROWS.forEach(r=>applyFx(r.id));paintMix()}
 
 /* ---------- humanize: per-voice lean (ms at 100%) + random drift ---------- */
-const LEAN={kick:7,snare:20,clap:18,chat:-9,ohat:-6,clave:0,conga:4,tumba:6};
+const LEAN={kick:7,snare:20,clap:18,chat:-9,ohat:-6,clave:0,conga:4,tumba:6,shaker:-5};
 let GHOST=0.32;
 const rnd=()=>(Math.random()+Math.random()-1); // soft bell curve, -1..1
 function feel(id,step){
@@ -1151,9 +1169,9 @@ function stop(){if(typeof recStopHook==='function')recStopHook();playing=false;c
   $('ico').innerHTML='<path d="M7 4l13 8-13 8z"/>';$('play').setAttribute('aria-label','Play');try{wake?.release()}catch(e){}wake=null}
 
 /* ---------- sample library + kit ---------- */
-const CATS=[['kick','Kicks'],['snare','Snares'],['clap','Claps'],['hat','Hats'],['ohat','Open hats'],['cym','Cymbals'],['tom','Toms'],['perc','Perc'],['loop','Loops'],['other','Other']];
+const CATS=[['kick','Kicks'],['snare','Snares'],['clap','Claps'],['hat','Hats'],['ohat','Open hats'],['cym','Cymbals'],['tom','Toms'],['perc','Perc'],['loop','Loops'],['other','Other'],['syn','Built-in']];
 const CATLABEL=Object.fromEntries(CATS);
-const ROWCAT={kick:'kick',snare:'snare',clap:'clap',chat:'hat',ohat:'ohat',clave:'perc',conga:'perc',tumba:'perc',loop:'loop'};
+const ROWCAT={kick:'kick',snare:'snare',clap:'clap',chat:'hat',ohat:'ohat',clave:'perc',conga:'perc',tumba:'perc',shaker:'perc',loop:'loop'};
 const AUDIO_RE=/\.(wav|wave|aif|aiff|mp3|m4a|flac|ogg|caf)$/i, MAXBYTES=30*1024*1024;
 const tokens=s=>s.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/(\d+)/g,' $1 ').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 const has=(t,...w)=>w.some(x=>t.includes(x));
@@ -1197,7 +1215,7 @@ const setLibMsg=(t,kind='kit')=>{$(kind==='loop'?'lpMsg':'libmsg').textContent=t
 async function refreshLib(){const all=await libAll(),byPath=(a,b)=>a.path.localeCompare(b.path,undefined,{numeric:true,sensitivity:'base'});
   all.forEach(m=>{if(!m.kind)m.kind=m.cat==='loop'?'loop':'kit'});
   lib=all.filter(m=>m.kind==='kit').sort(byPath);loopLib=all.filter(m=>m.kind==='loop').sort(byPath);
-  libById=new Map(all.map(m=>[m.id,m]));renderLibInfo();renderKit();renderLoop();if(browserRow)renderBrowser()}
+  libById=new Map(all.map(m=>[m.id,m]));SYNMETA.forEach(m=>libById.set(m.id,m));renderLibInfo();renderKit();renderLoop();if(browserRow)renderBrowser()}
 function renderLibInfo(){const el=$('libinfo');$('libClear').hidden=!lib.length;$('lpClear').hidden=!loopLib.length;
   const keep=LIB.mem?' This browser won’t keep them after you close the page.':'';
   if(!lib.length)el.textContent='No one-shots yet. Import your pack (the .zip works as is) and the kicks, snares, hats and more get sorted by file and folder name. Breaks and loops in it are left for the Loop player.';
@@ -1268,8 +1286,9 @@ async function loadBuf(id){if(bufs.has(id))return bufs.get(id);const ab=await li
   const b=await decode(ab.slice(0));bufs.set(id,b);
   if(bufs.size>160){const keep=new Set([...Object.values(kit),loop.id]);for(const k of bufs.keys()){if(bufs.size<=120)break;if(!keep.has(k))bufs.delete(k)}}
   return b}
-async function loadKitBuffers(k=kit,lp=loop){if(!ctx)return;await Promise.all([...Object.values(k),lp&&lp.id].filter(id=>id&&libById.has(id)).map(id=>loadBuf(id).catch(()=>{})))}
-function rowList(rowId){if(rowId==='loop')return loopLib;const c=ROWCAT[rowId],l=lib.filter(m=>m.cat===c);return l.length?l:lib}
+async function loadKitBuffers(k=kit,lp=loop){if(!ctx)return;await Promise.all([...Object.values(k),lp&&lp.id].filter(id=>id&&!id.startsWith('syn:')&&libById.has(id)).map(id=>loadBuf(id).catch(()=>{})))}
+function rowList(rowId){if(rowId==='loop')return loopLib;const c=ROWCAT[rowId],l=lib.filter(m=>m.cat===c),base=l.length?l:lib;
+  return ['perc','hat','ohat'].includes(c)?[...SYNMETA,...base]:base}
 function autoAssign(){['kick','snare','clap','chat','ohat'].forEach(r=>{if(kit[r]&&libById.has(kit[r]))return;const m=lib.find(x=>x.cat===ROWCAT[r]);if(m)kit[r]=m.id});save();renderKit();loadKitBuffers()}
 async function assign(rowId,id){
   if(rowId==='loop')return setLoopSample(id);
@@ -1290,7 +1309,7 @@ function renderKit(){const el=$('kitrows');el.innerHTML='';try{setTimeout(render
     sel.querySelector('.kc').textContent=m?`${CATLABEL[m.cat]} · ${idx+1} of ${fmt(l.length)}`:(lib.length?`Built-in · ${fmt(l.length)} ${pool} to try`:'Built-in sound');
     sel.setAttribute('aria-label',`${r.name}: ${m?m.name:'built-in synth'}. Choose a sound`);
     prev.setAttribute('aria-label',`Previous ${r.name.toLowerCase()} sound`);next.setAttribute('aria-label',`Next ${r.name.toLowerCase()} sound`);
-    prev.disabled=next.disabled=!lib.length;
+    prev.disabled=next.disabled=!l.length;
     nm.onclick=async()=>{await ensureAudio();await loadKitBuffers();hit(r.id,ctx.currentTime+0.01,1)};
     prev.onclick=()=>stepRow(r.id,-1);next.onclick=()=>stepRow(r.id,1);
     sel.onclick=()=>browserRow===r.id?closeBrowser():openBrowser(r.id);
@@ -1376,7 +1395,7 @@ async function kitSlotTap(i){
     const name=$('kitName').value.trim()||`Kit ${i+1}`;kitSlots[i]={name,kit:clone(kit),mix:{lv:clone(lv),fx:clone(fx)}};$('kitName').value=name;
     kitArmed=false;$('kitStore').setAttribute('aria-pressed','false');kitSlotStore.set(kitSlots);renderKitSlots();setLibMsg(`Stored ${name} in K${i+1}.`);return}
   const sn=kitSlots[i];if(!sn)return;
-  kit={};Object.entries(sn.kit).forEach(([r,id])=>{if(libById.has(id))kit[r]=id});if(sn.mix){loadMix(sn.mix)}
+  kit={};Object.entries(sn.kit).forEach(([r,id])=>{if(libById.has(id)||String(id).startsWith('syn:'))kit[r]=id});if(sn.mix){loadMix(sn.mix)}
   const miss=Object.keys(sn.kit).length-Object.keys(kit).length;
   $('kitName').value=sn.name;save();renderKit();updateSel();
   setLibMsg(miss?`${sn.name} loaded. ${miss} sound${miss===1?' isn’t':'s aren’t'} in the library on this device, so ${miss===1?'that row uses':'those rows use'} the synth.`:`${sn.name} loaded.`);
@@ -1389,7 +1408,7 @@ function openBrowser(rowId){browserRow=rowId;const c=ROWCAT[rowId];bCat=lib.some
   (rowId==='loop'?$('loopSec'):$('kitBlock')).after($('browser'));
   $('browser').hidden=false;renderKit();renderLoop();renderBrowser();try{$('browser').scrollIntoView({block:'nearest',behavior:'smooth'})}catch(e){}}
 function closeBrowser(){browserRow=null;$('browser').hidden=true;renderKit();renderLoop()}
-function renderBrowser(){if(!browserRow)return;const r=ROWS.find(x=>x.id===browserRow),isLoop=browserRow==='loop',src=isLoop?loopLib:lib;
+function renderBrowser(){if(!browserRow)return;const r=ROWS.find(x=>x.id===browserRow),isLoop=browserRow==='loop',src=isLoop?loopLib:[...lib,...SYNMETA];
   $('bTitle').textContent=r?`${r.name} sound`:'Loop';
   let tabs;
   if(isLoop){const counts={};src.forEach(m=>{const f=folderOf(m);counts[f]=(counts[f]||0)+1});const fs=Object.keys(counts).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
@@ -1503,7 +1522,7 @@ function presetSnap(key,label){const p=PRESETS[key];
   return {name:label,pats:{a:ROWS.map(r=>(p.a[r.id]||Array(16).fill(0)).slice()),b:ROWS.map(r=>(p.b[r.id]||Array(16).fill(0)).slice())},
     bpm:p.bpm,swing:p.swing/100,hum:(p.hum??40)/100,varA:0.5,varB:0.3}}
 function snap(){return {name:$('patName').value.trim()||'My pattern',pats:clone(pats),bpm,swing,hum,varA,varB,kit:clone(kit),loop:clone(loop)}}
-function applySnap(sn){pats=clone(sn.pats);$('patName').value=sn.name||'';$('preset').value='custom';setBpm(sn.bpm);setSwing(Math.round(sn.swing*100));setHum(Math.round(sn.hum*100));
+function applySnap(sn){pats=normPats(clone(sn.pats));$('patName').value=sn.name||'';$('preset').value='custom';setBpm(sn.bpm);setSwing(Math.round(sn.swing*100));setHum(Math.round(sn.hum*100));
   setVar('a',Math.round(sn.varA*100));setVar('b',Math.round(sn.varB*100));motif={a:null,b:null};if(sn.kit){kit=clone(sn.kit);renderKit()}if(sn.loop){loop={...LOOP0,...clone(sn.loop)};renderLoop()}updateSel();loadKitBuffers();paintAll();clearMarks();save()}
 function persistSlots(){slotStore.set({slots,activeSlot})}
 function renderSlots(){const el=$('slots');el.innerHTML='';$('slots').parentElement.classList.toggle('armed',storeArmed);
@@ -1566,8 +1585,8 @@ function setPage(pg){
   document.querySelector('.d1top').append(nav)})();
 buildGrid();makeKnobs();makeKeys();knobLoop();
 const saved=store.get();
-if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length===ROWS.length){
-  pats=saved.pats;mute=saved.mute||mute;setBpm(saved.bpm||100);setSwing(Math.round((saved.swing||0.5)*100));
+if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length>=8){
+  pats=normPats(saved.pats);mute=ROWS.map((r,i)=>!!(saved.mute&&saved.mute[i]));setBpm(saved.bpm||100);setSwing(Math.round((saved.swing||0.5)*100));
   setHum(Math.round((saved.hum??0.4)*100));mode=saved.mode||'trade';barsEach=saved.barsEach||4;
   $('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
 else loadPreset('son');
