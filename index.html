@@ -503,6 +503,18 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .slot .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.12;font-size:.8rem;text-overflow:clip}
 @media (min-width:760px){.favrow .slot{height:52px}}
 #kitReset.armed,#mixReset.armed{color:#ffb3a3;background:#5a1e18}
+
+/* mixer channel strips */
+.strips{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
+.strip{display:flex;flex-direction:column;align-items:center;gap:12px;padding:10px 4px 14px;border-radius:4px;background:rgba(0,0,0,.2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.04)}
+.stn{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:.72rem;letter-spacing:.1em;color:var(--silk);max-width:100%;overflow:hidden}
+.stn::before{content:"";flex:none;width:9px;height:9px;border-radius:2px;background:var(--c)}
+.strip .kctl{width:auto;max-width:none}
+.strip .kctl label{font-size:.66rem}
+.mixer .fxk{grid-template-columns:repeat(9,minmax(0,1fr))!important}
+#fxVoice{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
+#fxVoice .keyb{min-width:0}
+@media (max-width:759px){.strips,#fxVoice{grid-template-columns:repeat(3,minmax(0,1fr))}.mixer .fxk{grid-template-columns:repeat(4,1fr)!important}}
 </style>
 
 <div class="wrap">
@@ -1562,14 +1574,18 @@ function setPage(pg){
   bank.append($('clickVol').closest('.ctl'));bank.append(mk('vol','Volume',0,100,80));tr.after(bank);
   const mixer=document.createElement('div');mixer.className='subsec mixer';mixer.id='mixer';
   const head=t=>{const h=document.createElement('div');h.className='bankhead';h.innerHTML=`<span class="lbl">${t}</span>`;return h};
-  const mix=document.createElement('div');mix.className='knobbank mix';ROWS.forEach(r=>mix.append(mk('lv_'+r.id,r.name,0,150,100)));
-  const pans=document.createElement('div');pans.className='knobbank mix pans';ROWS.forEach(r=>pans.append(mk('pan_'+r.id,r.name,-100,100,0)));
+  const strips=document.createElement('div');strips.className='strips';
+  ROWS.forEach(r=>{const st=document.createElement('div');st.className='strip';st.style.setProperty('--c',`var(--${r.id})`);
+    const nm=document.createElement('div');nm.className='stn lbl';nm.textContent=r.name;
+    const L=mk('lv_'+r.id,'Level',0,150,100),P=mk('pan_'+r.id,'Pan',-100,100,0);
+    L.querySelector('input').setAttribute('aria-label',r.name+' level');P.querySelector('input').setAttribute('aria-label',r.name+' pan');
+    st.append(nm,L,P);strips.append(st)});
   const vk=document.createElement('div');vk.className='keys';vk.id='fxVoice';vk.setAttribute('role','radiogroup');vk.setAttribute('aria-label','Voice to edit');
   ROWS.forEach(r=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=r.id;b.setAttribute('role','radio');b.style.setProperty('--c',`var(--${r.id})`);
     b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=r.name.replace('Open hat','O.hat');b.onclick=()=>selectFxVoice(r.id);vk.append(b)});
   const fxb=document.createElement('div');fxb.className='knobbank fxk';
   fxb.append(mk('fxTone','Filter',-100,100,0),mk('fxDrive','Drive',0,100,0),mk('fxRoom','Room',0,100,0),mk('fxSub','Sub bass',0,100,0));
-  mixer.append(head('Mixer · level'),mix,head('Pan'),pans,head('Voice FX'),vk,fxb);
+  mixer.append(head('Mixer'),strips,head('Voice FX'),vk,fxb);
   document.querySelector('.ruler').after(mixer);
   const arrs=[...document.querySelectorAll('.deck1 .arr')],opts=arrs[0];opts.classList.add('opts');
   [$('click').closest('.ctl'),$('fills').closest('label'),$('countin').closest('label')].forEach(e=>opts.append(e));
