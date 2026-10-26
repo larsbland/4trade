@@ -485,6 +485,23 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
   .cell{min-height:20px}
 }
 @media (min-width:760px) and (max-height:760px){.deck1{gap:8px 20px;padding-block:10px}.playhead .namebar{flex:1 1 0}}
+
+/* straight (zero feel) key */
+.zkey{position:relative;width:50px;height:50px;border-radius:3px;border:none;background:linear-gradient(180deg,#f0e9d6,#d6ccb3);color:var(--ink);font-family:var(--mono);font-weight:600;font-size:1.15rem;
+  box-shadow:0 0 0 1px #7d725d,0 4px 0 #8d826a,0 5px 0 #3a342b,inset 0 1px 0 #fff;padding-top:8px}
+.zkey:active{transform:translateY(3px);box-shadow:0 0 0 1px #7d725d,0 1px 0 #8d826a,0 2px 0 #3a342b}
+.zkey.on .lamp{background:radial-gradient(circle at 40% 35%,#ffe2a8,#ff9a16 45%,#b55a00);box-shadow:0 0 8px 2px rgba(255,150,20,.6),0 0 0 1.5px #3a342b}
+/* section key glow: a full ring all the way round */
+.secs{padding:4px}
+.sec{overflow:visible}
+.sec.live{outline:3px solid #ff9a16;outline-offset:3px;box-shadow:0 0 0 1px #141210,0 4px 0 #141210,0 0 22px 6px rgba(255,150,20,.55)}
+.sec.solo.live{outline-color:#ff4a2e;box-shadow:0 0 0 1px #141210,0 4px 0 #141210,0 0 22px 6px rgba(255,74,46,.55)}
+.sec .secedit{border-radius:3px 0 0 3px}
+/* favorites: full names, tempo tucked in the top line */
+.slot{position:relative}
+.slot .b{position:absolute;top:5px;right:20px;font-size:.6rem;line-height:1}
+.slot .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.12;font-size:.8rem;text-overflow:clip}
+@media (min-width:760px){.favrow .slot{height:52px}}
 </style>
 
 <div class="wrap">
@@ -498,6 +515,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
     <div class="transport">
       <div class="tkgrp"><button id="play" aria-label="Play"><span class="lamp"></span><svg viewBox="0 0 24 24" id="ico"><path d="M7 4l13 8-13 8z"/></svg></button><span class="lbl">Start / stop</span></div>
       <div class="tkgrp"><div class="nudge"><button id="bdn" aria-label="Slower">−</button><button id="bup" aria-label="Faster">+</button></div><span class="lbl">Nudge</span></div>
+      <div class="tkgrp"><button id="zeroBtn" class="zkey" aria-label="Straight: set swing, humanize, variation and ghosts to zero. Tap again to bring them back"><span class="lamp"></span>0</button><span class="lbl">Straight</span></div>
       <div class="ctl tempoctl">
         <label for="bpm">Tempo <b id="bpmv">100 BPM</b></label>
         <input type="range" id="bpm" min="60" max="180" value="100">
@@ -523,7 +541,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 
     <div class="arr vary">
       <div class="ctl"><label for="click">Click</label>
-        <select id="click"><option value="off">Off</option><option value="all">Always</option><option value="solo">During solo only</option><option value="eighths">Always, 8ths</option></select></div>
+        <select id="click"><option value="off">Off</option><option value="all">Always</option><option value="solo">During solo only</option><option value="eighths">Always, 8ths</option><option value="trip">Always, triplets</option></select></div>
       <div class="ctl"><label for="clickVol">Click level <b id="clickVolv">60%</b></label><input type="range" id="clickVol" min="0" max="100" value="60"></div>
       <label class="chk" for="countin"><input type="checkbox" id="countin" checked> 1-bar count-in</label>
     </div>
@@ -562,7 +580,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
         <optgroup label="Dilla style"><option value="drunk">Drunk 16ths</option><option value="lean">Late snare lean</option><option value="bounce">Bounce</option><option value="fallin">Falling kicks</option><option value="donut">Donut chop</option><option value="stumble">Stumble</option><option value="slum">Slum swing</option></optgroup>
         <optgroup label="Latin / dance"><option value="son">Son clave 3-2 + tumbao</option><option value="rumba">Rumba clave 3-2</option><option value="four">Four on the floor</option><option value="guaguanco">Guaguancó</option><option value="songo">Songo</option><option value="chacha">Cha-cha-chá</option><option value="bossa">Bossa nova</option><option value="samba">Samba</option></optgroup>
       </select>
-      <button class="btn" id="copy">Copy groove → bed</button>
+      <button class="btn" id="copy">Copy groove → solo</button>
       <button class="btn" id="clear">Clear</button>
     </div>
 
@@ -895,7 +913,7 @@ function knobLoop(){syncKeys();for(const kb of knobs){if(kb.inp.value!==kb.last)
 /* ---------- latching keys in place of menus and checkboxes ---------- */
 const keyed=[];
 function makeKeys(){
-  const SHORT={click:{off:'Off',all:'Always',solo:'Solo',eighths:'8ths'},lpWhere:{a:'Groove',b:'Solo',both:'Both'},recMode:{groove:'Groove',free:'Mic only'}};
+  const SHORT={click:{off:'Off',all:'Always',solo:'Solo',eighths:'8ths',trip:'Triplets'},lpWhere:{a:'Groove',b:'Solo',both:'Both'},recMode:{groove:'Groove',free:'Mic only'}};
   ['bars','click','lpBars','lpWhere','recMode'].forEach(id=>{const sel=$(id);if(!sel)return;const row=document.createElement('div');row.className='keys';row.setAttribute('role','radiogroup');
     const lab=sel.closest('.ctl')&&sel.closest('.ctl').querySelector('label');if(lab)row.setAttribute('aria-label',lab.textContent.trim());
     [...sel.options].forEach(o=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=o.value;b.setAttribute('role','radio');
@@ -907,7 +925,11 @@ function makeKeys(){
     b.setAttribute('aria-label',lab?lab.textContent.trim():t);b.onclick=()=>{cb.checked=!cb.checked;cb.dispatchEvent(new Event('change',{bubbles:true}))};
     lab.replaceWith(b);b.after(cb);cb.hidden=true;keyed.push({cb,btn:b,last:null})});
 }
-function syncKeys(){for(const k of keyed){if(k.sel){const v=k.sel.value;if(v===k.last)continue;k.last=v;
+const ZIDS=['swing','hum','varA','varB','ghost'];let zeroPrev=null;
+function isZero(){return ZIDS.every(id=>$(id)&&+$(id).value===+$(id).min)}
+function zeroFeel(){const go=(vals)=>ZIDS.forEach(id=>{$(id).value=vals[id];$(id).dispatchEvent(new Event('input',{bubbles:true}))});
+  if(isZero()&&zeroPrev){go(zeroPrev);zeroPrev=null}else{zeroPrev=Object.fromEntries(ZIDS.map(id=>[id,$(id).value]));go(Object.fromEntries(ZIDS.map(id=>[id,$(id).min])))}}
+function syncKeys(){const zb=$('zeroBtn');if(zb){const z=isZero();if(zb._z!==z){zb._z=z;zb.classList.toggle('on',z);zb.setAttribute('aria-pressed',z)}}for(const k of keyed){if(k.sel){const v=k.sel.value;if(v===k.last)continue;k.last=v;
     k.row.querySelectorAll('.keyb').forEach(b=>{const on=b.dataset.v===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)})}
   else{const v=k.cb.checked;if(v===k.last)continue;k.last=v;k.btn.classList.toggle('on',v);k.btn.setAttribute('aria-pressed',v)}}}
 
@@ -982,9 +1004,9 @@ function voice(id,t){
   }
 }
 /* metronome: dry, straight to the master, never humanized */
-function click(t,accent){if(clickVol<=0)return;const o=osc('sine',t,0.05),g=gain();o.frequency.value=accent?1800:1150;
-  env(g,t,(accent?0.9:0.55)*clickVol,0.03);o.connect(g).connect(master)}
-function clickOn(sec){return clickMode==='all'||clickMode==='eighths'||(clickMode==='solo'&&sec==='b')}
+function click(t,accent,soft){if(clickVol<=0)return;const o=osc('sine',t,0.05),g=gain();o.frequency.value=accent?1800:soft?950:1150;
+  env(g,t,(accent?0.9:soft?0.35:0.55)*clickVol,0.03);o.connect(g).connect(master)}
+function clickOn(sec){return clickMode==='all'||clickMode==='eighths'||clickMode==='trip'||(clickMode==='solo'&&sec==='b')}
 /* one hit at a given velocity, routed through its own gain */
 function hit(id,t,vel){const g=gain();g.gain.value=vel*(lv[id]??1);g.connect(chan[id]?chan[id].in:master);
   if(id==='kick'&&fx.kick.sub>0){const o=ctx.createOscillator(),sg=gain();o.type='sine';o.frequency.setValueAtTime(64,t);o.frequency.exponentialRampToValueAtTime(43,t+0.14);
@@ -1108,6 +1130,7 @@ function schedule(){
     const anySolo=solo.some(Boolean);
     if(!ducked)ROWS.forEach((r,i)=>{if(p[i][cur]&&!mute[i]&&(!anySolo||solo[i])){const f=feel(r.id,cur);hit(r.id,Math.max(ctx.currentTime+0.005,grid+f.dt),f.vel*(p[i][cur]===2?GHOST:1))}});
     if(clickOn(sec)&&(cur%4===0||(clickMode==='eighths'&&cur%2===0)))click(nextTime,cur===0);
+    if(clickOn(sec)&&clickMode==='trip'&&cur%4===0){const bt=60/bpm;click(nextTime+bt/3,false,true);click(nextTime+2*bt/3,false,true)}
     queue.push({step:cur,bar,sec,pat:curPat,time:grid});
     nextTime+=sixteenth;cur++;if(cur===16){cur=0;bar++}
   }
@@ -1513,7 +1536,7 @@ function setPage(pg){
 (function relayout(){const tr=document.querySelector('.transport');tr.append($('tempoWin').closest('.tempo'));
   const bank=document.createElement('div');bank.className='knobbank';
   const mk=(id,label,min,max,val)=>{const c=document.createElement('div');c.className='ctl';c.innerHTML=`<label for="${id}">${label} <b id="${id}v">${val}%</b></label><input type="range" id="${id}" min="${min}" max="${max}" value="${val}">`;return c};
-  ['bpm','swing','hum','varA','varB'].forEach(id=>bank.append($(id).closest('.ctl')));bank.append(mk('ghost','Ghost level',10,70,32));
+  ['bpm','swing','hum','varA','varB'].forEach(id=>bank.append($(id).closest('.ctl')));bank.append(mk('ghost','Ghost level',0,70,32));
   bank.append($('clickVol').closest('.ctl'));bank.append(mk('vol','Volume',0,100,80));tr.after(bank);
   const mixer=document.createElement('div');mixer.className='subsec mixer';mixer.id='mixer';
   const head=t=>{const h=document.createElement('div');h.className='bankhead';h.innerHTML=`<span class="lbl">${t}</span>`;return h};
@@ -1597,6 +1620,7 @@ function setClickVol(pct){clickVol=pct/100;$('clickVol').value=pct;$('clickVolv'
 $('click').onchange=e=>{clickMode=e.target.value;save()};
 $('clickVol').oninput=e=>{setClickVol(+e.target.value);save()};
 $('countin').onchange=e=>{countIn=e.target.checked;save()};
+$('zeroBtn').onclick=zeroFeel;
 function setPct(id,v){$(id).value=v;$(id+'v').textContent=Math.round(v)+'%'}
 $('vol').oninput=e=>{masterVol=+e.target.value/100;$('volv').textContent=e.target.value+'%';if(master)master.gain.value=masterVol;save()};
 $('ghost').oninput=e=>{GHOST=+e.target.value/100;$('ghostv').textContent=e.target.value+'%';save()};
