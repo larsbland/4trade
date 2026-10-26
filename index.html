@@ -1068,7 +1068,7 @@ const K=RI('kick'),S=RI('snare'),C=RI('clap'),H=RI('chat'),O=RI('ohat'),CL=RI('c
 const ch=x=>Math.random()<x, pick=a=>a[Math.floor(Math.random()*a.length)];
 const copyPat=p=>p.map(r=>r.slice()), used=(p,i)=>p[i].some(v=>v);
 let motif={a:null,b:null};
-function setVar(sec,pct){if(sec==='a'){varA=pct/100;$('varA').value=pct;$('varAv').textContent=pct+'%'}else{varB=pct/100;$('varB').value=pct;$('varBv').textContent=pct+'%'}}
+function setVar(sec,pct){try{motif[sec]=null}catch(e){}if(sec==='a'){varA=pct/100;$('varA').value=pct;$('varAv').textContent=pct+'%'}else{varB=pct/100;$('varB').value=pct;$('varBv').textContent=pct+'%'}}
 
 function vary(base,sec,amt){
   const p=copyPat(base); if(amt<=0)return p;
