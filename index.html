@@ -515,6 +515,14 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 #fxVoice{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
 #fxVoice .keyb{min-width:0}
 @media (max-width:759px){.strips,#fxVoice{grid-template-columns:repeat(3,minmax(0,1fr))}.mixer .fxk{grid-template-columns:repeat(4,1fr)!important}}
+
+/* per-row pack picker */
+.krow{grid-template-columns:96px 32px minmax(0,1fr) 32px}
+.kcol{display:flex;flex-direction:column;gap:3px;min-width:0;justify-content:center}
+.kcol .kname{padding:0}
+.kpack{font:inherit;font-family:var(--silkface);font-size:.68rem;font-weight:600;letter-spacing:.04em;padding:3px 4px;border-radius:3px;border:none;background:#150d02;color:var(--led-g);box-shadow:inset 0 1px 3px #000,0 0 0 1px #4b4743;max-width:100%;min-width:0}
+#loadPack{font-family:var(--silkface);font-weight:700;font-size:.78rem;letter-spacing:.06em;padding:7px 8px;border-radius:3px;border:none;background:linear-gradient(180deg,#4b4743,#36332f);color:var(--silk);box-shadow:0 0 0 1px #141210,0 3px 0 #141210;margin-left:10px}
+.packchips{padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08)}
 </style>
 
 <div class="wrap">
@@ -613,7 +621,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 
     <div class="kit" id="kitSec">
       <div class="subsec" id="kitBlock">
-        <div class="bankhead"><span class="lbl">Kit</span>
+        <div class="bankhead"><span class="lbl">Kit</span><select id="loadPack" aria-label="Load a whole pack onto the kit" hidden></select>
           <span class="kitbtns"><button class="btn" id="kitReset" type="button">All built-in</button><label class="btn" for="fFiles">Import one-shots</label><label class="btn" for="fDir">Folder</label></span></div>
         <input type="file" id="fFiles" accept=".zip,application/zip,audio/*,.wav,.aif,.aiff,.mp3,.m4a,.flac,.ogg" multiple hidden>
         <input type="file" id="fDir" webkitdirectory multiple hidden>
@@ -673,6 +681,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 
       <div class="browser" id="browser" hidden>
         <div class="bhead"><span id="bTitle">Sound</span><button class="btn" id="bClose">Done</button></div>
+        <div class="chips packchips" id="packChips"></div>
         <div class="chips" id="chips"></div>
         <input type="search" id="bSearch" placeholder="Search by name or folder" aria-label="Search samples">
         <div class="blist" id="blist"></div>
@@ -848,7 +857,7 @@ let bpm=100, swing=0.5, hum=0.4, mode='trade', barsEach=4, varA=0.5, varB=0.3, f
 const $=id=>document.getElementById(id);
 const store={get(){try{return JSON.parse(localStorage.getItem('tumbao2'))}catch(e){return null}},set(v){try{localStorage.setItem('tumbao2',JSON.stringify(v))}catch(e){}}};
 let masterVol=0.8,lv=Object.fromEntries(ROWS.map(r=>[r.id,1]));
-function save(){store.set({vol:masterVol,ghost:GHOST,lv,fx,pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
+function save(){store.set({rowPack,vol:masterVol,ghost:GHOST,lv,fx,pats,mute,bpm,swing,hum,mode,barsEach,varA,varB,fills,clickMode,clickVol,countIn,kit,loop,name:$('patName').value,preset:$('preset').value})}
 
 /* ---------- grid UI ---------- */
 const cells=[];
@@ -1203,7 +1212,9 @@ function catOf(t){
   return null;
 }
 function classify(path){const parts=path.split('/');const file=parts.pop().replace(/\.[^.]+$/,'');
-  let c=catOf(tokens(file));for(let i=parts.length-1;!c&&i>=0;i--)c=catOf(tokens(parts[i]));return c||'other'}
+  const pf=parts.length?catOf(tokens(parts[parts.length-1])):null,fc=catOf(tokens(file));
+  if(fc==='loop')return 'loop';if(pf&&pf!=='loop')return (pf==='hat'&&fc==='ohat')?'ohat':pf;
+  let c=fc;for(let i=parts.length-1;!c&&i>=0;i--)c=catOf(tokens(parts[i]));return c||'other'}
 
 /* storage: IndexedDB on this device, in-memory if the browser refuses */
 const LIB={db:null,mem:false,memMeta:[],memBlobs:new Map()};
@@ -1227,7 +1238,7 @@ let lib=[],loopLib=[],libById=new Map(),kit={},bufs=new Map(),importing=false;
 const fmt=n=>n.toLocaleString();
 const setLibMsg=(t,kind='kit')=>{$(kind==='loop'?'lpMsg':'libmsg').textContent=t||''};
 async function refreshLib(){const all=await libAll(),byPath=(a,b)=>a.path.localeCompare(b.path,undefined,{numeric:true,sensitivity:'base'});
-  all.forEach(m=>{if(!m.kind)m.kind=m.cat==='loop'?'loop':'kit'});
+  all.forEach(m=>{if(!m.kind)m.kind=m.cat==='loop'?'loop':'kit';if(m.kind==='kit'){const c=classify(m.path);m.cat=c==='loop'?m.cat:c}});
   lib=all.filter(m=>m.kind==='kit').sort(byPath);loopLib=all.filter(m=>m.kind==='loop').sort(byPath);
   libById=new Map(all.map(m=>[m.id,m]));SYNMETA.forEach(m=>libById.set(m.id,m));renderLibInfo();renderKit();renderLoop();if(browserRow)renderBrowser()}
 function renderLibInfo(){const el=$('libinfo');$('libClear').hidden=!lib.length;$('lpClear').hidden=!loopLib.length;
@@ -1301,8 +1312,14 @@ async function loadBuf(id){if(bufs.has(id))return bufs.get(id);const ab=await li
   if(bufs.size>160){const keep=new Set([...Object.values(kit),loop.id]);for(const k of bufs.keys()){if(bufs.size<=120)break;if(!keep.has(k))bufs.delete(k)}}
   return b}
 async function loadKitBuffers(k=kit,lp=loop){if(!ctx)return;await Promise.all([...Object.values(k),lp&&lp.id].filter(id=>id&&!id.startsWith('syn:')&&libById.has(id)).map(id=>loadBuf(id).catch(()=>{})))}
-function rowList(rowId){if(rowId==='loop')return loopLib;const c=ROWCAT[rowId],l=lib.filter(m=>m.cat===c),base=l.length?l:lib;
-  return ['perc','hat','ohat'].includes(c)?[...SYNMETA,...base]:base}
+/* packs: the first folder under your samples folder */
+const ROOTS=/^(samples?|one[- _]?shots?|sounds|drums|audio)$/i;
+function packOf(m){if(!m||m.cat==='syn')return 'Built-in';const seg=m.path.split('/');seg.pop();if(seg.length&&ROOTS.test(seg[0]))seg.shift();return seg[0]||'Loose files'}
+function packList(){return [...new Set(lib.map(packOf))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}))}
+let rowPack={};const packFor=r=>rowPack[r]&&rowPack[r]!=='all'&&packList().includes(rowPack[r])?rowPack[r]:'all';
+function rowList(rowId){if(rowId==='loop')return loopLib;const pk=packFor(rowId),pool=pk==='all'?lib:lib.filter(m=>packOf(m)===pk);
+  const c=ROWCAT[rowId],l=pool.filter(m=>m.cat===c),base=l.length?l:pool;
+  return ['perc','hat','ohat'].includes(c)?[...base,...SYNMETA]:base}
 function autoAssign(){['kick','snare','clap','chat','ohat'].forEach(r=>{if(kit[r]&&libById.has(kit[r]))return;const m=lib.find(x=>x.cat===ROWCAT[r]);if(m)kit[r]=m.id});save();renderKit();loadKitBuffers()}
 async function assign(rowId,id){
   if(rowId==='loop')return setLoopSample(id);
@@ -1313,14 +1330,18 @@ async function assign(rowId,id){
 }
 function stepRow(rowId,dir){const l=rowList(rowId);if(!l.length)return;const i=l.findIndex(m=>m.id===kit[rowId]);
   let j=i+dir;if(j<-1)j=l.length-1;if(j>=l.length)j=-1;assign(rowId,j<0?null:l[j].id)}
-function renderKit(){const el=$('kitrows');el.innerHTML='';try{setTimeout(renderKitSlots,0)}catch(e){}
+function renderKit(){const el=$('kitrows');el.innerHTML='';try{renderLoadPack()}catch(e){}try{setTimeout(renderKitSlots,0)}catch(e){}
   ROWS.forEach(r=>{const m=kit[r.id]&&libById.get(kit[r.id]),l=rowList(r.id),idx=m?l.indexOf(m):-1,cat=ROWCAT[r.id];
     const row=document.createElement('div');row.className='krow'+(m?'':' synth')+(browserRow===r.id?' open':'');row.style.setProperty('--c',`var(--${r.id})`);
-    row.innerHTML='<button class="kname"></button><button class="kstep" data-d="-1">◀</button><button class="ksel"><span class="ks"></span><span class="kc"></span></button><button class="kstep" data-d="1">▶</button>';
-    const [nm,prev,sel,next]=row.children;nm.textContent=r.name;nm.setAttribute('aria-label',`Hear the ${r.name.toLowerCase()} sound`);
+    row.innerHTML='<div class="kcol"><button class="kname"></button><select class="kpack"></select></div><button class="kstep" data-d="-1">◀</button><button class="ksel"><span class="ks"></span><span class="kc"></span></button><button class="kstep" data-d="1">▶</button>';
+    const [col,prev,sel,next]=row.children,nm=col.firstChild,pk=col.lastChild,packs=packList();
+    pk.innerHTML='<option value="all">All packs</option>'+packs.map(n=>'<option></option>').join('');[...pk.options].slice(1).forEach((o,i)=>{o.value=packs[i];o.textContent=packs[i]});
+    pk.value=packFor(r.id);pk.hidden=packs.length<2;pk.setAttribute('aria-label',r.name+' pack');
+    pk.onchange=()=>{rowPack[r.id]=pk.value;save();const l2=rowList(r.id),first=l2.find(x=>x.cat!=='syn');
+      if(pk.value!=='all'&&first&&!l2.some(x=>x.id===kit[r.id]))assign(r.id,first.id);else renderKit();if(browserRow===r.id){bPack=pk.value;renderBrowser()}};nm.textContent=r.name;nm.setAttribute('aria-label',`Hear the ${r.name.toLowerCase()} sound`);
     sel.querySelector('.ks').textContent=m?m.name:'Synth';
     const pool=lib.some(x=>x.cat===cat)?CATLABEL[cat].toLowerCase():'samples';
-    sel.querySelector('.kc').textContent=m?`${CATLABEL[m.cat]} · ${idx+1} of ${fmt(l.length)}`:(lib.length?`Built-in · ${fmt(l.length)} ${pool} to try`:'Built-in sound');
+    sel.querySelector('.kc').textContent=m?`${m.cat==='syn'?'Built-in':packOf(m)+' · '+CATLABEL[m.cat]} · ${idx+1} of ${fmt(l.length)}`:(lib.length?`Built-in · ${fmt(l.length)} ${pool} to try`:'Built-in sound');
     sel.setAttribute('aria-label',`${r.name}: ${m?m.name:'built-in synth'}. Choose a sound`);
     prev.setAttribute('aria-label',`Previous ${r.name.toLowerCase()} sound`);next.setAttribute('aria-label',`Next ${r.name.toLowerCase()} sound`);
     prev.disabled=next.disabled=!l.length;
@@ -1418,11 +1439,29 @@ async function kitSlotTap(i){
 
 /* browser */
 let browserRow=null,bCat='all',bQuery='';
-function openBrowser(rowId){browserRow=rowId;const c=ROWCAT[rowId];bCat=lib.some(m=>m.cat===c)?c:'all';bQuery='';$('bSearch').value='';
+let bPack='all';
+const PICK={clave:['clave','rim','block','stick','click','cowbell','bell'],conga:['conga','quinto','bongo','djembe'],tumba:['tumba','tom','surdo','low conga','bass'],shaker:['shaker','shk','tamb','cabasa','maraca','shekere']};
+function loadPack(pk){const pool=lib.filter(m=>packOf(m)===pk);if(!pool.length)return;const used=new Set();
+  const first=c=>pool.find(m=>m.cat===c&&!used.has(m.id));
+  const pick={};
+  ROWS.forEach(r=>{if(!PICK[r.id])return;const m=pool.find(x=>!used.has(x.id)&&PICK[r.id].some(w=>x.path.split('/').pop().toLowerCase().includes(w)));if(m){pick[r.id]=m;used.add(m.id)}});
+  ROWS.forEach(r=>{let m=pick[r.id];const c=ROWCAT[r.id];
+    if(!m)m=first(c);if(!m&&c==='hat')m=first('ohat');if(!m&&c==='ohat')m=first('cym');
+    if(m){kit[r.id]=m.id;used.add(m.id);rowPack[r.id]=pk}});
+  save();renderKit();updateSel();setLibMsg(`Loaded ${pk} onto the kit. Use ◀ ▶ to change any row, or switch a row to another pack.`);
+  ensureAudio().then(()=>loadKitBuffers()).then(()=>{if(!playing)hit('kick',ctx.currentTime+0.01,1)})}
+function renderLoadPack(){const s=$('loadPack');if(!s)return;const packs=packList();s.hidden=packs.length<1||!lib.length;
+  s.innerHTML='<option value="">Load pack…</option>';packs.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;s.append(o)});s.value=''}
+function openBrowser(rowId){browserRow=rowId;bPack=rowId==='loop'?'all':packFor(rowId);const c=ROWCAT[rowId];bCat=lib.some(m=>m.cat===c&&(bPack==='all'||packOf(m)===bPack))?c:'all';bQuery='';$('bSearch').value='';
   (rowId==='loop'?$('loopSec'):$('kitBlock')).after($('browser'));
   $('browser').hidden=false;renderKit();renderLoop();renderBrowser();try{$('browser').scrollIntoView({block:'nearest',behavior:'smooth'})}catch(e){}}
 function closeBrowser(){browserRow=null;$('browser').hidden=true;renderKit();renderLoop()}
-function renderBrowser(){if(!browserRow)return;const r=ROWS.find(x=>x.id===browserRow),isLoop=browserRow==='loop',src=isLoop?loopLib:[...lib,...SYNMETA];
+function renderBrowser(){if(!browserRow)return;const r=ROWS.find(x=>x.id===browserRow),isLoop=browserRow==='loop';
+  const pc=$('packChips');pc.innerHTML='';const packs=isLoop?[]:packList();pc.hidden=packs.length<2;
+  if(!isLoop&&packs.length>1){[['all','All packs',lib.length],...packs.map(n=>[n,n,lib.filter(m=>packOf(m)===n).length])].forEach(([k,l,n])=>{
+    const b=document.createElement('button');b.className='chip';b.setAttribute('aria-pressed',k===bPack);b.innerHTML=`<span></span><i>${fmt(n)}</i>`;b.firstChild.textContent=l;
+    b.onclick=()=>{bPack=k;rowPack[browserRow]=k;save();renderKit();renderBrowser()};pc.append(b)})}
+  const src=isLoop?loopLib:[...(bPack==='all'?lib:lib.filter(m=>packOf(m)===bPack)),...SYNMETA];
   $('bTitle').textContent=r?`${r.name} sound`:'Loop';
   let tabs;
   if(isLoop){const counts={};src.forEach(m=>{const f=folderOf(m);counts[f]=(counts[f]||0)+1});const fs=Object.keys(counts).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
@@ -1606,7 +1645,7 @@ const saved=store.get();
 if(saved&&saved.pats&&saved.pats.a&&saved.pats.a.length>=8){
   pats=normPats(saved.pats);mute=ROWS.map((r,i)=>!!(saved.mute&&saved.mute[i]));setBpm(saved.bpm||100);setSwing(Math.round((saved.swing||0.5)*100));
   setHum(Math.round((saved.hum??0.4)*100));mode=saved.mode||'trade';barsEach=saved.barsEach||4;
-  $('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
+  $('bars').value=barsEach;setVar('a',Math.round((saved.varA??0.5)*100));setVar('b',Math.round((saved.varB??0.3)*100));fills=saved.fills??true;$('fills').checked=fills;clickMode=saved.clickMode||'off';$('click').value=clickMode;setClickVol(Math.round((saved.clickVol??0.6)*100));countIn=saved.countIn??true;$('countin').checked=countIn;kit=saved.kit||{};rowPack=saved.rowPack||{};loop={...LOOP0,...(saved.loop||{})};if(saved.preset)$('preset').value=saved.preset;$('patName').value=saved.name??'';paintAll()}
 else loadPreset('son');
 buildPips();resetStage();renderSlots();renderLibInfo();renderKit();refreshLib();
 [['libmsg','kitStop','kit'],['lpMsg','lpStop','loop']].forEach(([m,id])=>{const b=document.createElement('button');b.type='button';b.className='btn';b.id=id;b.textContent='Stop import';b.hidden=true;b.onclick=()=>{importCancel=true};$(m).after(b)});
@@ -1635,6 +1674,7 @@ $('lpSel').onclick=()=>browserRow==='loop'?closeBrowser():openBrowser('loop');
     clearTimeout(arm);arm=null;b.textContent='Reset mixer';b.classList.remove('armed');
     ROWS.forEach(r=>{lv[r.id]=0.8;Object.assign(fx[r.id],{pan:0,tone:0,drive:0,room:0,sub:0});applyFx(r.id)});paintMix();save();
     msg.textContent='Levels are at 80%, pans are centered and all effects are off.';setTimeout(()=>{msg.textContent=''},5000)}}
+$('loadPack').onchange=e=>{if(e.target.value)loadPack(e.target.value);e.target.value=''};
 $('kitStore').onclick=()=>{kitArmed=!kitArmed;$('kitStore').setAttribute('aria-pressed',kitArmed);renderKitSlots()};
 $('lpStore').onclick=()=>{lpArmed=!lpArmed;$('lpStore').setAttribute('aria-pressed',lpArmed);renderLpSlots()};
 $('lpOn').onclick=()=>{loop.on=!loop.on;save();renderLoop()};
