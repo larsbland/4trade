@@ -523,6 +523,10 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .kpack{font:inherit;font-family:var(--silkface);font-size:.68rem;font-weight:600;letter-spacing:.04em;padding:3px 4px;border-radius:3px;border:none;background:#150d02;color:var(--led-g);box-shadow:inset 0 1px 3px #000,0 0 0 1px #4b4743;max-width:100%;min-width:0}
 #loadPack{font-family:var(--silkface);font-weight:700;font-size:.78rem;letter-spacing:.06em;padding:7px 8px;border-radius:3px;border:none;background:linear-gradient(180deg,#4b4743,#36332f);color:var(--silk);box-shadow:0 0 0 1px #141210,0 3px 0 #141210;margin-left:10px}
 .packchips{padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.08)}
+.bwrap{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;border-bottom:1px solid #222426}
+.bwrap .bitem{border-bottom:none}
+.bmove{border:none;border-left:1px solid #222426;background:none;color:#a59b86;font-family:var(--silkface);font-weight:700;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;padding:0 12px;white-space:nowrap}
+.bmove:hover{color:#ff9a16;background:#1c1e20}
 </style>
 
 <div class="wrap">
@@ -1213,7 +1217,7 @@ function catOf(t){
 }
 function classify(path){const parts=path.split('/');const file=parts.pop().replace(/\.[^.]+$/,'');
   const pf=parts.length?catOf(tokens(parts[parts.length-1])):null,fc=catOf(tokens(file));
-  if(fc==='loop')return 'loop';if(pf&&pf!=='loop')return (pf==='hat'&&fc==='ohat')?'ohat':pf;
+  if(fc==='loop'||pf==='loop')return 'loop';if(pf)return (pf==='hat'&&fc==='ohat')?'ohat':pf;
   let c=fc;for(let i=parts.length-1;!c&&i>=0;i--)c=catOf(tokens(parts[i]));return c||'other'}
 
 /* storage: IndexedDB on this device, in-memory if the browser refuses */
@@ -1230,6 +1234,29 @@ async function libPut(recs){
   else recs.forEach(r=>{LIB.memMeta.push(r.meta);LIB.memBlobs.set(r.meta.id,r.buf)})}
 async function libAll(){let m=[];try{const d=await idb();m=await reqP(d.transaction('meta').objectStore('meta').getAll())}catch(e){}return m.concat(LIB.memMeta)}
 async function libBuf(id){if(LIB.memBlobs.has(id))return LIB.memBlobs.get(id);const d=await idb();return reqP(d.transaction('blobs').objectStore('blobs').get(id))}
+/* length from the WAV/AIFF header, no decoding needed */
+function audioDur(ab){try{const v=new DataView(ab),n=v.byteLength,tag=o=>String.fromCharCode(v.getUint8(o),v.getUint8(o+1),v.getUint8(o+2),v.getUint8(o+3));
+  if(n>44&&tag(0)==='RIFF'&&tag(8)==='WAVE'){let o=12,br=0;while(o+8<=n){const id=tag(o),sz=v.getUint32(o+4,true);if(id==='fmt ')br=v.getUint32(o+16,true);
+      if(id==='data')return br?Math.min(sz,n-o-8)/br:0;o+=8+sz+(sz&1)}}
+  if(n>54&&tag(0)==='FORM'&&(tag(8)==='AIFF'||tag(8)==='AIFC')){let o=12;while(o+8<=n){const id=tag(o),sz=v.getUint32(o+4,false);
+      if(id==='COMM'){const fr=v.getUint32(o+10,false),e=v.getUint16(o+16,false)&0x7fff,hi=v.getUint32(o+18,false),sr=hi*Math.pow(2,e-16383-31);return sr?fr/sr:0}o+=8+sz+(sz&1)}}
+}catch(e){}return 0}
+function lengthSaysLoop(path,dur,cat){if(!dur||dur<1.2)return false;const name=path.split('/').pop();
+  for(const x of tokens(name)){const t=+x;if(t>=60&&t<=200)for(const b of [1,2,4,8,16])if(Math.abs(dur*t/240-b)/b<0.015)return true}
+  if(cat==='kick'||cat==='cym')return false;return dur>=(['hat','ohat','clap','perc'].includes(cat)?2.5:3.5)}
+async function libPutMeta(ms){try{const d=await idb();const tx=d.transaction('meta','readwrite');ms.forEach(m=>tx.objectStore('meta').put(m));await txDone(tx)}catch(e){}}
+async function moveKind(id,to,quiet){const m=libById.get(id);if(!m||m.cat==='syn'||m.kind===to)return;
+  m.kind=to;if(to==='loop'){m.cat='loop';Object.keys(kit).forEach(r=>{if(kit[r]===id)delete kit[r]})}else{const c=classify(m.path);m.cat=c==='loop'?'other':c;if(loop.id===id){loop.id=null;loop.on=false;stopLoops()}}
+  await libPutMeta([m]);if(!quiet){save();await refreshLib();setLibMsg(to==='loop'?`Moved ${m.name} to the Loop player.`:`Moved ${m.name} to the kit.`,to==='loop'?'kit':'loop')}}
+let scanning=false;
+async function scanLengths(){if(scanning)return;const todo=lib.filter(m=>m.dur==null);if(!todo.length)return;scanning=true;let moved=0;const upd=[];
+  try{for(let i=0;i<todo.length;i++){const m=todo[i];if(i%10===0){setLibMsg(`Checking sample lengths… ${fmt(i+1)} of ${fmt(todo.length)}`);await new Promise(r=>setTimeout(r,0))}
+      let ab=null;try{ab=await libBuf(m.id)}catch(e){}m.dur=ab?audioDur(ab):0;
+      if(lengthSaysLoop(m.path,m.dur,m.cat)){m.kind='loop';m.cat='loop';Object.keys(kit).forEach(r=>{if(kit[r]===m.id)delete kit[r]});moved++}
+      upd.push(m);if(upd.length>=40)await libPutMeta(upd.splice(0))}
+    if(upd.length)await libPutMeta(upd)}finally{scanning=false}
+  if(moved){save();await refreshLib()}
+  setLibMsg(moved?`Checked sample lengths: moved ${fmt(moved)} loop${moved===1?'':'s'} from the kit to the Loop player. Use “→ Kit” in the loop browser if any belong back.`:'')}
 async function libClear(kind){LIB.memMeta=LIB.memMeta.filter(m=>(m.kind||'kit')!==kind);
   const ids=[...libById.values()].filter(m=>m.kind===kind).map(m=>m.id);ids.forEach(id=>LIB.memBlobs.delete(id));
   try{const d=await idb();const tx=d.transaction(['meta','blobs'],'readwrite');ids.forEach(id=>{tx.objectStore('meta').delete(id);tx.objectStore('blobs').delete(id)});await txDone(tx)}catch(e){}}
@@ -1240,7 +1267,7 @@ const setLibMsg=(t,kind='kit')=>{$(kind==='loop'?'lpMsg':'libmsg').textContent=t
 async function refreshLib(){const all=await libAll(),byPath=(a,b)=>a.path.localeCompare(b.path,undefined,{numeric:true,sensitivity:'base'});
   all.forEach(m=>{if(!m.kind)m.kind=m.cat==='loop'?'loop':'kit';if(m.kind==='kit'){const c=classify(m.path);m.cat=c==='loop'?m.cat:c}});
   lib=all.filter(m=>m.kind==='kit').sort(byPath);loopLib=all.filter(m=>m.kind==='loop').sort(byPath);
-  libById=new Map(all.map(m=>[m.id,m]));SYNMETA.forEach(m=>libById.set(m.id,m));renderLibInfo();renderKit();renderLoop();if(browserRow)renderBrowser()}
+  setTimeout(()=>scanLengths(),400);libById=new Map(all.map(m=>[m.id,m]));SYNMETA.forEach(m=>libById.set(m.id,m));renderLibInfo();renderKit();renderLoop();if(browserRow)renderBrowser()}
 function renderLibInfo(){const el=$('libinfo');$('libClear').hidden=!lib.length;$('lpClear').hidden=!loopLib.length;
   const keep=LIB.mem?' This browser won’t keep them after you close the page.':'';
   if(!lib.length)el.textContent='No one-shots yet. Import your pack (the .zip works as is) and the kicks, snares, hats and more get sorted by file and folder name. Breaks and loops in it are left for the Loop player.';
@@ -1265,7 +1292,7 @@ async function importRun(items,kind){
   let skipped=items.length-audio.length,other=0;
   const isLoop=it=>classify(it.path)==='loop';
   if(kind==='kit'){const n=audio.length;audio=audio.filter(it=>!isLoop(it));other=n-audio.length}
-  else{const ls=audio.filter(isLoop);if(ls.length){other=audio.length-ls.length;audio=ls}}
+  let loopPicky=false;if(kind==='loop'){const ls=audio.filter(isLoop);loopPicky=ls.length>0||audio.length>40}
   let added=0,dup=0,batch=[],stopped='',unread=0;
   try{
     for(let i=0;i<audio.length;i++){
@@ -1275,8 +1302,11 @@ async function importRun(items,kind){
       let buf=null;try{buf=await withTimeout(it.get(),20000)}catch(e){unread++;continue}
       if(!buf||buf.byteLength>MAXBYTES){skipped++;continue}
       const id=kind+':'+it.path+'|'+buf.byteLength;if(known.has(id)){dup++;continue}known.add(id);
-      const cat=kind==='loop'?'loop':classify(it.path);
-      batch.push({meta:{id,kind,path:it.path,name:it.path.split('/').pop().replace(/\.[^.]+$/,''),cat,size:buf.byteLength},buf});added++;
+      const dur=audioDur(buf),guess=classify(it.path),longLoop=guess!=='loop'&&lengthSaysLoop(it.path,dur,guess);
+      if(kind==='kit'&&longLoop){other++;continue}
+      if(kind==='loop'&&loopPicky&&guess!=='loop'&&!longLoop){other++;continue}
+      const cat=kind==='loop'?'loop':guess;
+      batch.push({meta:{id,kind,path:it.path,name:it.path.split('/').pop().replace(/\.[^.]+$/,''),cat,size:buf.byteLength,dur},buf});added++;
       if(batch.length>=20){await libPut(batch);batch=[]}
     }
     if(batch.length)await libPut(batch);
@@ -1476,7 +1506,11 @@ function renderBrowser(){if(!browserRow)return;const r=ROWS.find(x=>x.id===brows
   const list=$('blist');list.innerHTML='';
   const mk=(label,sub,id)=>{const b=document.createElement('button');b.className='bitem';b.dataset.id=id||'';
     b.innerHTML='<span class="bn"></span><span class="bp"></span>';b.querySelector('.bn').textContent=label;b.querySelector('.bp').textContent=sub;
-    b.onclick=()=>assign(browserRow,id);return b};
+    b.onclick=()=>assign(browserRow,id);
+    if(!id||String(id).startsWith('syn:'))return b;
+    const w=document.createElement('div');w.className='bwrap';const mv=document.createElement('button');mv.type='button';mv.className='bmove';
+    mv.textContent=isLoop?'→ Kit':'→ Loops';mv.setAttribute('aria-label',isLoop?`Move ${label} to the kit`:`Move ${label} to the loop player`);
+    mv.onclick=async()=>{await moveKind(id,isLoop?'kit':'loop');renderBrowser()};w.append(b,mv);return w};
   list.append(isLoop?mk('No loop','Drum machine only',null):mk('Built-in synth','4TRADE’s own sound',null));
   const LIM=300;l.slice(0,LIM).forEach(m=>list.append(mk(m.name,m.path.split('/').slice(0,-1).slice(-2).join(' / ')||(isLoop?'Loop':CATLABEL[m.cat]),m.id)));
   const note=t=>{const p=document.createElement('p');p.className='bmore';p.textContent=t;list.append(p)};
