@@ -527,6 +527,10 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .bwrap .bitem{border-bottom:none}
 .bmove{border:none;border-left:1px solid #222426;background:none;color:#a59b86;font-family:var(--silkface);font-weight:700;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;padding:0 12px;white-space:nowrap}
 .bmove:hover{color:#ff9a16;background:#1c1e20}
+.lmnote{display:none;padding:8px 12px;border-radius:3px;background:#150d02;color:#d9cfb8;font-size:.86rem;box-shadow:inset 0 2px 5px #000,0 0 0 2px #4b4743}
+.lmnote .lbl{color:#ff9a16;margin-right:8px}
+body.loopmode .lmnote{display:block}
+body.loopmode #grid{opacity:.35}
 </style>
 
 <div class="wrap">
@@ -659,6 +663,10 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
             <select id="lpBars"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option><option value="8">8 bars</option><option value="16">16 bars</option></select></div>
           <div class="ctl"><label for="lpWhere">Plays in</label>
             <select id="lpWhere"><option value="a">Groove</option><option value="b">Solo</option><option value="both">Groove and solo</option></select></div>
+          <div class="ctl"><label for="lpGap">Then click for</label>
+            <select id="lpGap"><option value="0">Off</option><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option><option value="8">8 bars</option></select></div>
+          <div class="ctl"><label for="lpGapType">Click</label>
+            <select id="lpGapType"><option value="q">Quarters</option><option value="8">8ths</option></select></div>
           <div class="ctl"><label for="lpLvl">Level <b id="lpLvlv">80%</b></label><input type="range" id="lpLvl" min="0" max="100" value="80"></div>
         </div>
         <div class="edit"><button class="btn" id="lpTempo">Use loop tempo</button><label class="chk" for="lpDuck"><input type="checkbox" id="lpDuck"> Mute pads under loop</label></div>
@@ -942,7 +950,7 @@ function knobLoop(){syncKeys();for(const kb of knobs){if(kb.inp.value!==kb.last)
 const keyed=[];
 function makeKeys(){
   const SHORT={click:{off:'Off',all:'Always',solo:'Solo',eighths:'8ths',trip:'Triplets'},lpWhere:{a:'Groove',b:'Solo',both:'Both'},recMode:{groove:'Groove',free:'Mic only'}};
-  ['bars','click','lpBars','lpWhere','recMode'].forEach(id=>{const sel=$(id);if(!sel)return;const row=document.createElement('div');row.className='keys';row.setAttribute('role','radiogroup');
+  ['bars','click','lpBars','lpWhere','lpGap','lpGapType','recMode'].forEach(id=>{const sel=$(id);if(!sel)return;const row=document.createElement('div');row.className='keys';row.setAttribute('role','radiogroup');
     const lab=sel.closest('.ctl')&&sel.closest('.ctl').querySelector('label');if(lab)row.setAttribute('aria-label',lab.textContent.trim());
     [...sel.options].forEach(o=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=o.value;b.setAttribute('role','radio');
       b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=(SHORT[id]&&SHORT[id][o.value])||o.text.replace(/ bars?$/,'');
@@ -966,9 +974,9 @@ function syncKeys(){const zb=$('zeroBtn');if(zb){const z=isZero();if(zb._z!==z){
 /* ---------- arrangement ---------- */
 function cycleLen(){return mode==='trade'?barsEach*2:barsEach}
 function sectionFor(bar){if(mode==='a')return 'a';if(mode==='b')return 'b';return (bar%cycleLen())<barsEach?'a':'b'}
-function buildPips(){const el=$('pips');el.innerHTML='';
+function buildPips(){const el=$('pips');el.innerHTML='';el.dataset.k='seq';
   for(let i=0;i<cycleLen();i++){const p=document.createElement('div');p.className='pip'+(sectionFor(i)==='b'?' b':'');el.append(p)}}
-function showBar(bar,step){
+function showBar(bar,step){if($('pips').dataset.k!=='seq')buildPips();
   const pos=bar%cycleLen(),sec=sectionFor(bar),within=(pos%barsEach)+1;
   playingSec=sec;updateOffsec();$('secA').classList.toggle('live',sec==='a');$('secB').classList.toggle('live',sec==='b');
   const st=$('stage');st.classList.toggle('solo',sec==='b'&&mode==='trade');
@@ -1170,6 +1178,12 @@ function schedule(){
     if(cur===0&&pendingSlot>=0)takeSlot();
     const sixteenth=60/bpm/4;
     const grid=nextTime+(cur%2?(swing-0.5)*2*sixteenth:0);
+    if(loopMode()){const cyc=loop.bars+(loop.gap||0),pos=bar%cyc,inGap=pos>=loop.bars;
+      if(cur===0){if(inGap)gapClicks(nextTime);else loopSeg(nextTime,pos)}
+      if(!inGap&&clickMode!=='off'&&clickMode!=='solo'){if(cur%4===0||(clickMode==='eighths'&&cur%2===0))click(nextTime,cur===0);
+        if(clickMode==='trip'&&cur%4===0){const bt=60/bpm;click(nextTime+bt/3,false,true);click(nextTime+2*bt/3,false,true)}}
+      queue.push({step:cur,bar,sec:'a',pat:curPat||pats.a,time:grid,lm:true});
+      nextTime+=sixteenth;cur++;if(cur===16){cur=0;bar++}continue}
     if(cur===0||!curPat)curPat=barPattern(bar);
     const sec=sectionFor(bar),p=curPat;
     if(cur===0)scheduleLoopBar(nextTime,bar,sec);
@@ -1183,7 +1197,7 @@ function schedule(){
   }
 }
 function draw(){if(!playing)return;
-  while(queue.length&&queue[0].time<=ctx.currentTime){const q=queue.shift();light(q.step);showBar(q.bar,q.step);if(q.step===0)markBar(q)}
+  while(queue.length&&queue[0].time<=ctx.currentTime){const q=queue.shift();light(q.step);if(q.lm)showLoopBar(q.bar,q.step);else showBar(q.bar,q.step);if(q.step===0)markBar(q)}
   requestAnimationFrame(draw)}
 async function start(){playing=true;stopPreview();try{await ensureAudio()}catch(e){}try{await loadKitBuffers()}catch(e){}if(!playing)return;
   cur=0;bar=0;queue=[];curPat=null;motif={a:null,b:null};nextTime=ctx.currentTime+0.06;
@@ -1382,7 +1396,7 @@ function renderKit(){const el=$('kitrows');el.innerHTML='';try{renderLoadPack()}
 
 
 /* ---------- loop player: bar-sliced, varispeed to the tempo ---------- */
-const LOOP0={id:null,bars:2,bpm:100,dur:0,where:'a',level:0.8,on:false,duck:false};
+const LOOP0={id:null,bars:2,bpm:100,dur:0,where:'a',level:0.8,on:false,duck:false,gap:0,gapType:'q'};
 let loop={...LOOP0},loopSrcs=[],prevSrc=null;
 function analyzeLoop(name,dur){
   const cands=[];const m=name.match(/(\d{2,3}(?:\.\d+)?)\s*[-_ ]?bpm/i);if(m)cands.push(+m[1]);
@@ -1393,6 +1407,21 @@ function analyzeLoop(name,dur){
   if(best)return {bars:best.bars,bpm:best.bpm};
   const pb=Math.max(1,Math.round(dur*bpm/240));return {bars:pb,bpm:240*pb/dur}}
 const loopIn=sec=>loop.on&&loop.id&&(loop.where==='both'||loop.where===sec)&&bufs.has(loop.id);
+/* loop mode: the loop player runs on its own, the pads stay silent */
+function loopMode(){return !!(loop.on&&loop.id&&bufs.has(loop.id))}
+function loopSeg(t,idx){const b=bufs.get(loop.id),seg=240/loop.bpm,off=idx*seg;if(off>=b.duration-0.005)return;
+  const s=ctx.createBufferSource(),g=gain();s.buffer=b;s.playbackRate.value=bpm/loop.bpm;g.gain.value=loop.level;
+  s.connect(g).connect(master);s.start(t,off,Math.min(seg,b.duration-off));loopSrcs.push(s);s.onended=()=>{loopSrcs=loopSrcs.filter(x=>x!==s)}}
+function gapClicks(t){const bt=60/bpm;for(let i=0;i<4;i++){click(t+i*bt,i===0);if(loop.gapType==='8')click(t+i*bt+bt/2,false,true)}}
+function showLoopBar(bar,step){const cyc=loop.bars+(loop.gap||0),pos=bar%cyc,inGap=pos>=loop.bars,el=$('pips'),key='lm'+loop.bars+'/'+(loop.gap||0);
+  if(el.dataset.k!==key){el.dataset.k=key;el.innerHTML='';for(let i=0;i<cyc;i++){const d=document.createElement('div');d.className='pip'+(i>=loop.bars?' b':'');el.append(d)}}
+  [...el.children].forEach((d,i)=>d.classList.toggle('now',i===pos));
+  $('secA').classList.remove('live');$('secB').classList.remove('live');
+  const st=$('stage'),nextGap=((pos+1)%cyc)>=loop.bars,warn=(loop.gap>0)&&nextGap!==inGap&&step>=8;
+  st.classList.toggle('solo',inGap);st.classList.toggle('warn',warn);
+  $('secname').textContent=inGap?'Click':'Loop';
+  const within=inGap?pos-loop.bars+1:pos+1,len=inGap?loop.gap:loop.bars;
+  $('barinfo').textContent=warn?(inGap?'loop next bar':'click next bar'):`bar ${within} of ${len}`}
 function scheduleLoopBar(t,bar,sec){
   if(!loopIn(sec))return;const b=bufs.get(loop.id),seg=240/loop.bpm,off=(bar%loop.bars)*seg;if(off>=b.duration-0.005)return;
   const s=ctx.createBufferSource(),g=gain();s.buffer=b;s.playbackRate.value=bpm/loop.bpm;g.gain.value=loop.level;
@@ -1418,7 +1447,8 @@ function renderLoop(){
   const on=!!(loop.on&&m);$('lpOn').setAttribute('aria-pressed',on);$('lpOn').textContent=on?'Loop on':'Loop off';$('lpOn').disabled=!m;
   $('lpPrev').disabled=$('lpNext').disabled=!loopLib.length;
   $('lpBars').value=String(loop.bars);$('lpWhere').value=loop.where;$('lpLvl').value=Math.round(loop.level*100);$('lpLvlv').textContent=Math.round(loop.level*100)+'%';
-  $('lpDuck').checked=loop.duck;try{renderLpSlots()}catch(e){}$('lpTempo').disabled=!m;$('loopSec').classList.toggle('open',browserRow==='loop')}
+  $('lpDuck').checked=loop.duck;$('lpGap').value=String(loop.gap||0);$('lpGapType').value=loop.gapType||'q';
+  document.body.classList.toggle('loopmode',!!(loop.on&&loop.id));try{renderLpSlots()}catch(e){}$('lpTempo').disabled=!m;$('loopSec').classList.toggle('open',browserRow==='loop')}
 
 /* loop favorites: four quick-recall buttons */
 let lpSlots=[null,null,null,null],lpArmed=false;
@@ -1632,7 +1662,7 @@ function takeSlot(){const i=pendingSlot;pendingSlot=-1;if(slots[i]){applySnap(sl
 /* ---------- pages ---------- */
 const PAGES=[['play','Play'],['mixer','Mixer'],['samples','Samples'],['loops','Loops'],['record','Record'],['help','Help']];
 function setPage(pg){
-  const map={play:['.playhead','#grid','.ruler','.favrow'],mixer:['#mixer'],samples:['#kitBlock'],loops:['#loopSec'],record:['#recSec'],help:['.helppg']};
+  const map={play:['.playhead','.lmnote','#grid','.ruler','.favrow'],mixer:['#mixer'],samples:['#kitBlock'],loops:['#loopSec'],record:['#recSec'],help:['.helppg']};
   if(!map[pg])pg='play';if(typeof browserRow!=='undefined'&&browserRow)closeBrowser();
   Object.entries(map).forEach(([k,sels])=>sels.forEach(q=>{const el=document.querySelector(q);if(el)el.hidden=k!==pg}));
   $('kitSec').hidden=!['samples','loops','record'].includes(pg);
@@ -1716,6 +1746,11 @@ $('lpBars').onchange=e=>{loop.bars=+e.target.value;if(loop.dur)loop.bpm=240*loop
 $('lpWhere').onchange=e=>{loop.where=e.target.value;save()};
 $('lpLvl').oninput=e=>{loop.level=+e.target.value/100;$('lpLvlv').textContent=e.target.value+'%';save()};
 $('lpDuck').onchange=e=>{loop.duck=e.target.checked;save()};
+$('lpGap').onchange=e=>{loop.gap=+e.target.value;save();renderLoop()};
+$('lpGapType').onchange=e=>{loop.gapType=e.target.value;save()};
+$('lpWhere').closest('.ctl').hidden=true;document.querySelectorAll('#loopSec .keyb.toggle').forEach(b=>b.hidden=true);
+{const n=document.createElement('div');n.className='lmnote';n.innerHTML='<span class="lbl">Loop player is on</span> The drum pads are off while a loop plays. Turn it off on the Loops page to use the sequencer.';
+  document.querySelector('.playhead').after(n)}
 function followLoopTempo(){if(!loop.on||!loop.id||!libById.has(loop.id))return;let t=loop.bpm;while(t>180)t/=2;while(t<60)t*=2;setBpm(t)}
 $('lpTempo').onclick=()=>{let t=loop.bpm;while(t>180)t/=2;while(t<60)t*=2;setBpm(t);save()};
 $('bSearch').oninput=e=>{bQuery=e.target.value;renderBrowser()};
