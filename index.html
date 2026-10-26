@@ -1612,12 +1612,12 @@ $('lpSel').onclick=()=>browserRow==='loop'?closeBrowser():openBrowser('loop');
   if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='All built-in';b.classList.remove('armed')},3000);return}
   clearTimeout(arm);arm=null;b.textContent='All built-in';b.classList.remove('armed');
   kit={};save();renderKit();updateSel();setLibMsg('Every row is back on its original built-in sound. Your samples are still in the library, and the mixer settings are unchanged.')}}
-{const h=document.querySelector('#mixer .bankhead');const b=document.createElement('button');b.type='button';b.className='btn';b.id='mixReset';b.textContent='Reset pans & FX';h.append(b);
+{const h=document.querySelector('#mixer .bankhead');const b=document.createElement('button');b.type='button';b.className='btn';b.id='mixReset';b.textContent='Reset mixer';h.append(b);
   const msg=document.createElement('div');msg.className='libmsg';msg.id='mixMsg';msg.setAttribute('aria-live','polite');h.after(msg);let arm=null;
-  b.onclick=()=>{if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='Reset pans & FX';b.classList.remove('armed')},3000);return}
-    clearTimeout(arm);arm=null;b.textContent='Reset pans & FX';b.classList.remove('armed');
-    ROWS.forEach(r=>{Object.assign(fx[r.id],{pan:0,tone:0,drive:0,room:0,sub:0});applyFx(r.id)});paintMix();save();
-    msg.textContent='Pans are centered and all effects are off. Levels are unchanged.';setTimeout(()=>{msg.textContent=''},5000)}}
+  b.onclick=()=>{if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='Reset mixer';b.classList.remove('armed')},3000);return}
+    clearTimeout(arm);arm=null;b.textContent='Reset mixer';b.classList.remove('armed');
+    ROWS.forEach(r=>{lv[r.id]=0.8;Object.assign(fx[r.id],{pan:0,tone:0,drive:0,room:0,sub:0});applyFx(r.id)});paintMix();save();
+    msg.textContent='Levels are at 80%, pans are centered and all effects are off.';setTimeout(()=>{msg.textContent=''},5000)}}
 $('kitStore').onclick=()=>{kitArmed=!kitArmed;$('kitStore').setAttribute('aria-pressed',kitArmed);renderKitSlots()};
 $('lpStore').onclick=()=>{lpArmed=!lpArmed;$('lpStore').setAttribute('aria-pressed',lpArmed);renderLpSlots()};
 $('lpOn').onclick=()=>{loop.on=!loop.on;save();renderLoop()};
