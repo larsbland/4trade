@@ -909,7 +909,7 @@ function updateOffsec(){$('grid').classList.toggle('offsec',playing&&playingSec!
 function loadPreset(name){const p=PRESETS[name];
   pats={a:ROWS.map(r=>(p.a[r.id]||Array(16).fill(0)).slice()),b:ROWS.map(r=>(p.b[r.id]||Array(16).fill(0)).slice())};
   const o=document.querySelector(`#preset option[value="${name}"]`);$('preset').value=name;$('patName').value=o?o.text:'';
-  setBpm(p.bpm);setSwing(p.swing);if(p.hum!=null)setHum(p.hum);paintAll();save()}
+  setBpm(p.bpm);setSwing(p.swing);if(p.hum!=null)setHum(p.hum);try{followLoopTempo()}catch(e){}paintAll();save()}
 function setBpm(v){bpm=Math.max(60,Math.min(180,Math.round(+v)));$('bpm').value=bpm;$('bpmv').textContent=bpm+' BPM';try{renderTempo()}catch(e){}try{renderLoop()}catch(e){}}
 function setSwing(pct){$('swing').value=pct;swing=pct/100;$('swv').textContent=pct+'%'}
 function setHum(pct){$('hum').value=pct;hum=pct/100;$('humv').textContent=pct+'%'}
@@ -1406,7 +1406,7 @@ async function setLoopSample(id){
   if(!id){loop.id=null;loop.on=false;save();renderLoop();updateSel();return}
   await ensureAudio();let b;try{b=await loadBuf(id)}catch(e){const m=libById.get(id);setLibMsg(`Can’t play ${m?m.name:'that file'} in this browser. A WAV version of it will work.`,'loop');return}
   const m=libById.get(id),a=analyzeLoop(m.name,b.duration);
-  Object.assign(loop,{id,bars:a.bars,bpm:a.bpm,dur:b.duration,on:true});setLibMsg('','loop');save();renderLoop();updateSel();if(!playing)preview(b)}
+  Object.assign(loop,{id,bars:a.bars,bpm:a.bpm,dur:b.duration,on:true});followLoopTempo();setLibMsg('','loop');save();renderLoop();updateSel();if(!playing)preview(b)}
 function stepLoop(dir){const l=rowList('loop');if(!l.length)return;const i=l.findIndex(m=>m.id===loop.id);
   let j=i+dir;if(j<-1)j=l.length-1;if(j>=l.length)j=-1;setLoopSample(j<0?null:l[j].id)}
 function renderLoop(){
@@ -1439,7 +1439,7 @@ async function lpSlotTap(i){
   const sn=lpSlots[i];if(!sn)return;
   if(!libById.has(sn.id)){setLibMsg(`${sn.name} isn’t in the loop library on this device anymore. Import it again, or Store another loop here.`,'loop');return}
   await ensureAudio();let b;try{b=await loadBuf(sn.id)}catch(e){setLibMsg(`Can’t play ${sn.name} in this browser.`,'loop');return}
-  Object.assign(loop,{id:sn.id,bars:sn.bars,bpm:sn.bpm,dur:sn.dur||b.duration,on:true});save();renderLoop();updateSel();
+  Object.assign(loop,{id:sn.id,bars:sn.bars,bpm:sn.bpm,dur:sn.dur||b.duration,on:true});followLoopTempo();save();renderLoop();updateSel();
   if(!playing)preview(b)}
 (function(){const v=lpStore.get();if(Array.isArray(v))lpSlots=v.concat([null,null,null,null]).slice(0,4)})();
 
@@ -1610,7 +1610,7 @@ function presetSnap(key,label){const p=PRESETS[key];
     bpm:p.bpm,swing:p.swing/100,hum:(p.hum??40)/100,varA:0.5,varB:0.3}}
 function snap(){return {name:$('patName').value.trim()||'My pattern',pats:clone(pats),bpm,swing,hum,varA,varB,kit:clone(kit),loop:clone(loop)}}
 function applySnap(sn){pats=normPats(clone(sn.pats));$('patName').value=sn.name||'';$('preset').value='custom';setBpm(sn.bpm);setSwing(Math.round(sn.swing*100));setHum(Math.round(sn.hum*100));
-  setVar('a',Math.round(sn.varA*100));setVar('b',Math.round(sn.varB*100));motif={a:null,b:null};if(sn.kit){kit=clone(sn.kit);renderKit()}if(sn.loop){loop={...LOOP0,...clone(sn.loop)};renderLoop()}updateSel();loadKitBuffers();paintAll();clearMarks();save()}
+  setVar('a',Math.round(sn.varA*100));setVar('b',Math.round(sn.varB*100));motif={a:null,b:null};if(sn.kit){kit=clone(sn.kit);renderKit()}if(sn.loop){loop={...LOOP0,...clone(sn.loop)};renderLoop()}try{followLoopTempo()}catch(e){}updateSel();loadKitBuffers();paintAll();clearMarks();save()}
 function persistSlots(){slotStore.set({slots,activeSlot})}
 function renderSlots(){const el=$('slots');el.innerHTML='';$('slots').parentElement.classList.toggle('armed',storeArmed);
   slots.forEach((sn,i)=>{const b=document.createElement('button');b.className='slot'+(sn?'':' empty')+(i===activeSlot?' active':'')+(i===pendingSlot?' pending':'');
@@ -1711,11 +1711,12 @@ $('lpSel').onclick=()=>browserRow==='loop'?closeBrowser():openBrowser('loop');
 $('loadPack').onchange=e=>{if(e.target.value)loadPack(e.target.value);e.target.value=''};
 $('kitStore').onclick=()=>{kitArmed=!kitArmed;$('kitStore').setAttribute('aria-pressed',kitArmed);renderKitSlots()};
 $('lpStore').onclick=()=>{lpArmed=!lpArmed;$('lpStore').setAttribute('aria-pressed',lpArmed);renderLpSlots()};
-$('lpOn').onclick=()=>{loop.on=!loop.on;save();renderLoop()};
-$('lpBars').onchange=e=>{loop.bars=+e.target.value;if(loop.dur)loop.bpm=240*loop.bars/loop.dur;save();renderLoop()};
+$('lpOn').onclick=()=>{loop.on=!loop.on;followLoopTempo();save();renderLoop()};
+$('lpBars').onchange=e=>{loop.bars=+e.target.value;if(loop.dur)loop.bpm=240*loop.bars/loop.dur;followLoopTempo();save();renderLoop()};
 $('lpWhere').onchange=e=>{loop.where=e.target.value;save()};
 $('lpLvl').oninput=e=>{loop.level=+e.target.value/100;$('lpLvlv').textContent=e.target.value+'%';save()};
 $('lpDuck').onchange=e=>{loop.duck=e.target.checked;save()};
+function followLoopTempo(){if(!loop.on||!loop.id||!libById.has(loop.id))return;let t=loop.bpm;while(t>180)t/=2;while(t<60)t*=2;setBpm(t)}
 $('lpTempo').onclick=()=>{let t=loop.bpm;while(t>180)t/=2;while(t<60)t*=2;setBpm(t);save()};
 $('bSearch').oninput=e=>{bQuery=e.target.value;renderBrowser()};
 [['kitBlock','kit'],['loopSec','loop']].forEach(([id,kind])=>{const k=$(id);
