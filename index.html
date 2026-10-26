@@ -515,7 +515,7 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
     <div class="transport">
       <div class="tkgrp"><button id="play" aria-label="Play"><span class="lamp"></span><svg viewBox="0 0 24 24" id="ico"><path d="M7 4l13 8-13 8z"/></svg></button><span class="lbl">Start / stop</span></div>
       <div class="tkgrp"><div class="nudge"><button id="bdn" aria-label="Slower">−</button><button id="bup" aria-label="Faster">+</button></div><span class="lbl">Nudge</span></div>
-      <div class="tkgrp"><button id="zeroBtn" class="zkey" aria-label="Straight: set swing, humanize, variation and ghosts to zero. Tap again to bring them back"><span class="lamp"></span>0</button><span class="lbl">Straight</span></div>
+      <div class="tkgrp"><button id="zeroBtn" class="zkey" aria-label="Straight: set swing, humanize, variation and ghosts to zero and turn fills off. Tap again to bring them back"><span class="lamp"></span>0</button><span class="lbl">Straight</span></div>
       <div class="ctl tempoctl">
         <label for="bpm">Tempo <b id="bpmv">100 BPM</b></label>
         <input type="range" id="bpm" min="60" max="180" value="100">
@@ -926,9 +926,11 @@ function makeKeys(){
     lab.replaceWith(b);b.after(cb);cb.hidden=true;keyed.push({cb,btn:b,last:null})});
 }
 const ZIDS=['swing','hum','varA','varB','ghost'];let zeroPrev=null;
-function isZero(){return ZIDS.every(id=>$(id)&&+$(id).value===+$(id).min)}
-function zeroFeel(){const go=(vals)=>ZIDS.forEach(id=>{$(id).value=vals[id];$(id).dispatchEvent(new Event('input',{bubbles:true}))});
-  if(isZero()&&zeroPrev){go(zeroPrev);zeroPrev=null}else{zeroPrev=Object.fromEntries(ZIDS.map(id=>[id,$(id).value]));go(Object.fromEntries(ZIDS.map(id=>[id,$(id).min])))}}
+function isZero(){return ZIDS.every(id=>$(id)&&+$(id).value===+$(id).min)&&!$('fills').checked}
+function zeroFeel(){const go=(vals)=>{ZIDS.forEach(id=>{$(id).value=vals[id];$(id).dispatchEvent(new Event('input',{bubbles:true}))});
+    if($('fills').checked!==vals.fills){$('fills').checked=vals.fills;$('fills').dispatchEvent(new Event('change',{bubbles:true}))}};
+  if(isZero()&&zeroPrev){go(zeroPrev);zeroPrev=null}
+  else{zeroPrev=Object.fromEntries(ZIDS.map(id=>[id,$(id).value]));zeroPrev.fills=$('fills').checked;go({...Object.fromEntries(ZIDS.map(id=>[id,$(id).min])),fills:false})}}
 function syncKeys(){const zb=$('zeroBtn');if(zb){const z=isZero();if(zb._z!==z){zb._z=z;zb.classList.toggle('on',z);zb.setAttribute('aria-pressed',z)}}for(const k of keyed){if(k.sel){const v=k.sel.value;if(v===k.last)continue;k.last=v;
     k.row.querySelectorAll('.keyb').forEach(b=>{const on=b.dataset.v===v;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)})}
   else{const v=k.cb.checked;if(v===k.last)continue;k.last=v;k.btn.classList.toggle('on',v);k.btn.setAttribute('aria-pressed',v)}}}
