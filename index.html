@@ -1860,11 +1860,12 @@ const BTN_IDS=['play','zeroBtn','bdn','bup','tabA','tabB','playA','playB'];
 const BTN_NAMES={play:'Start / stop',zeroBtn:'Straight',bdn:'Tempo −',bup:'Tempo +',tabA:'Edit groove',tabB:'Edit solo',playA:'Groove on/off',playB:'Solo on/off'};
 const defMap=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'lv_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:FEEL[i]}});m['cc:1']={t:'rowsel'};return m};
 const MK='4trade_midi';
-let cfg={on:false,map:defMap(),rel:false,pads:'steps',row:6};
+let cfg={on:false,map:defMap(),rel:false,pads:'steps',row:6,leds:true};
 try{const s=JSON.parse(localStorage.getItem(MK));if(s&&typeof s==='object')cfg={...cfg,...s,map:s.map&&typeof s.map==='object'?s.map:defMap()}}catch(e){}
 cfg.row=Math.max(0,Math.min(ROWS.length-1,cfg.row|0));
 const persist=()=>{try{localStorage.setItem(MK,JSON.stringify(cfg))}catch(e){}};
 let access=null,inputs=[],learn=false,learnTgt=null;const acc={};
+let outs=[],ledCh=0,ledHead=-1;let sent=Array(16).fill(null);
 
 /* ---- UI ---- */
 const sec=document.createElement('div');sec.className='subsec midisec';sec.id='midiSec';sec.hidden=true;
@@ -1874,6 +1875,9 @@ sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><sp
  <div class="ctl"><span class="lbl">Pads</span><div class="keys" id="midiPads" role="radiogroup" aria-label="What the pads do">
   <button type="button" class="keyb" data-v="steps" role="radio"><span class="kl"></span><span class="kt">Steps</span></button>
   <button type="button" class="keyb" data-v="play" role="radio"><span class="kl"></span><span class="kt">Play sounds</span></button></div></div>
+ <div class="ctl"><span class="lbl">Pad lights</span><div class="keys" id="midiLeds" role="radiogroup" aria-label="Light the controller's pads">
+  <button type="button" class="keyb" data-v="on" role="radio"><span class="kl"></span><span class="kt">On</span></button>
+  <button type="button" class="keyb" data-v="off" role="radio"><span class="kl"></span><span class="kt">Off</span></button></div></div>
  <div class="ctl"><span class="lbl">Knobs send</span><div class="keys" id="midiRel" role="radiogroup" aria-label="How the knobs send their values">
   <button type="button" class="keyb" data-v="abs" role="radio"><span class="kl"></span><span class="kt">Absolute</span></button>
   <button type="button" class="keyb" data-v="rel" role="radio"><span class="kl"></span><span class="kt">Relative</span></button></div></div>
@@ -1885,7 +1889,7 @@ sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><sp
 <div class="midimap" id="midiExtra"></div>
 <div class="edit"><button class="btn ledbtn" id="midiLearn" type="button" aria-pressed="false">MIDI learn</button><button class="btn" id="midiReset" type="button">BeatStep layout</button></div>`;
 document.querySelector('.helppg').before(sec);
-{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h)}
+{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. With Pad lights on, the BeatStep’s pads light up to match the steps on that row, and a light runs across them as the groove plays. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h)}
 const tab=document.createElement('button');tab.type='button';tab.className='pgtab';tab.dataset.pg='midi';tab.textContent='MIDI';tab.onclick=()=>setPage('midi');
 {const hp=document.querySelector('.pgtab[data-pg="help"]');hp?hp.before(tab):document.querySelector('.pgtabs').append(tab);tab.parentElement.classList.add('hasmidi')}
 const learnBar=document.createElement('div');learnBar.className='learnbar';learnBar.hidden=true;learnBar.setAttribute('role','status');
@@ -1922,8 +1926,9 @@ function paint(){const on=!!access;$('midiOn').setAttribute('aria-pressed',on);$
   tab.classList.toggle('live',!!(access&&inputs.length));
   document.querySelectorAll('#midiPads .keyb').forEach(b=>{const s=b.dataset.v===cfg.pads;b.classList.toggle('on',s);b.setAttribute('aria-checked',s)});
   document.querySelectorAll('#midiRel .keyb').forEach(b=>{const s=(b.dataset.v==='rel')===!!cfg.rel;b.classList.toggle('on',s);b.setAttribute('aria-checked',s)});
+  document.querySelectorAll('#midiLeds .keyb').forEach(b=>{const s=(b.dataset.v==='on')===!!cfg.leds;b.classList.toggle('on',s);b.setAttribute('aria-checked',s)});
   $('midiLearn').setAttribute('aria-pressed',learn);renderKnobs();paintRow()}
-function selectRow(i){cfg.row=(i+ROWS.length)%ROWS.length;persist();paintRow()}
+function selectRow(i){cfg.row=(i+ROWS.length)%ROWS.length;persist();paintRow();ledSync()}
 
 /* ---- audio helpers ---- */
 function audioOk(){if(ctx&&ctx.state==='running')return true;
@@ -1937,7 +1942,17 @@ function onMsg(e){const d=e.data;if(!d||!d.length)return;const s=d[0];
   if(s===0xF0){if(d.length>=6&&d[1]===0x7F&&d[3]===0x06){const c=d[4];if(c===2||c===3)transport(true);else if(c===1||c===9)transport(false)}return}
   if(s===0xFA||s===0xFB){transport(true);return}if(s===0xFC){transport(false);return}if(s>0xEF||d.length<3)return;
   const type=s&0xF0,ch=s&0x0F;
-  if(type===0x90&&d[2]>0)onNote(d[1],d[2],ch);else if(type===0xB0)onCC(d[1],d[2])}
+  if(type===0x90&&d[2]>0){if(padIndex(d[1])>=0)ledCh=ch;onNote(d[1],d[2],ch)}
+  else if(type===0x80||type===0x90){const p=padIndex(d[1]);if(p>=0){sent[p]=null;setTimeout(ledSync,15)}}
+  else if(type===0xB0)onCC(d[1],d[2])}
+/* ---- pad lights: lit = steps that are on in the selected row; the playhead flips the current pad ---- */
+const padNote=p=>p<8?44+p:36+p-8;
+function ledSync(force){if(!outs.length)return;if(force)sent=Array(16).fill(null);
+  const row=cfg.leds&&cfg.pads==='steps'?pats[editing][cfg.row]:null;
+  for(let p=0;p<16;p++){let on=!!(row&&row[p]);if(cfg.leds&&p===ledHead)on=!on;
+    if(sent[p]===on)continue;sent[p]=on;const m=on?[0x90|ledCh,padNote(p),127]:[0x80|ledCh,padNote(p),0];
+    outs.forEach(o=>{try{o.send(m)}catch(e){}})}}
+{const orig=window.light;window.light=function(step){orig(step);if(ledHead!==step){ledHead=step;ledSync()}}}
 function onNote(n,v,ch){const key='note:'+n;
   if(learn&&learnTgt){assign(key,'note');return}
   const m=cfg.map[key];if(m){act(m,127);return}
@@ -1961,7 +1976,7 @@ function stepPad(k,v){const i=cfg.row,p=pats[editing];
   p[i][k]=p[i][k]?0:(v<=50?2:1);paintCell(i,k);cells[i][k].classList.remove('add','drop');save();
   try{motif[editing]=null;if(playing&&curPat&&sectionFor(bar)===editing)curPat[i][k]=p[i][k]}catch(e){}
   if(p[i][k]&&!playing){if(ctx&&ctx.state==='running')hit(ROWS[i].id,ctx.currentTime+0.005,p[i][k]===2?GHOST:1);else wakeAudio()}
-  renderPads()}
+  renderPads();ledSync()}
 function playPad(p,v){if(p>=ROWS.length)return;
   if(!ctx||ctx.state!=='running'){wakeAudio();return}
   hit(ROWS[p].id,ctx.currentTime+0.003,Math.max(0.08,v/127))}
@@ -1988,6 +2003,7 @@ function assign(key,kind){const t=learnTgt;
 
 /* ---- connect ---- */
 function wire(){if(!access)return;inputs=[...access.inputs.values()].filter(i=>i.state!=='disconnected');inputs.forEach(i=>{i.onmidimessage=onMsg});
+  const names=new Set(inputs.map(i=>i.name));outs=[...access.outputs.values()].filter(o=>o.state!=='disconnected'&&(names.has(o.name)||/beatstep/i.test(o.name||'')));ledSync(true);
   if(!inputs.length)msg('MIDI is on. Plug in the BeatStep (or any USB MIDI controller) and it will show up here.');
   else{const names=inputs.map(i=>i.name||'MIDI device').join(', ');
     msg('Connected: '+names+'.'+(!access.sysexEnabled&&/beatstep/i.test(names)?' Play and Stop on the BeatStep need full MIDI access: allow it in this site’s settings (the icon left of the address bar), then reload.':''))}
@@ -1998,11 +2014,12 @@ async function connect(){if(typeof framed!=='undefined'&&framed){msg('MIDI works
   catch(e){try{access=await navigator.requestMIDIAccess()}catch(e2){access=null;cfg.on=false;persist();paint();
     msg('MIDI access was blocked. Allow MIDI for this site in the browser’s site settings, then tap Connect.');return}}
   cfg.on=true;persist();access.onstatechange=wire;wire()}
-function disconnect(){inputs.forEach(i=>{i.onmidimessage=null});if(access)access.onstatechange=null;access=null;inputs=[];cfg.on=false;persist();setLearn(false);msg('MIDI is off.');paint()}
+function disconnect(){ledHead=-1;const keep=cfg.leds;cfg.leds=false;ledSync(true);cfg.leds=keep;outs=[];inputs.forEach(i=>{i.onmidimessage=null});if(access)access.onstatechange=null;access=null;inputs=[];cfg.on=false;persist();setLearn(false);msg('MIDI is off.');paint()}
 
 /* ---- wire up ---- */
 $('midiOn').onclick=()=>{if(access)disconnect();else{wakeAudio();connect()}};
-document.querySelectorAll('#midiPads .keyb').forEach(b=>{b.onclick=()=>{cfg.pads=b.dataset.v;persist();paint()}});
+document.querySelectorAll('#midiPads .keyb').forEach(b=>{b.onclick=()=>{cfg.pads=b.dataset.v;persist();paint();ledSync()}});
+document.querySelectorAll('#midiLeds .keyb').forEach(b=>{b.onclick=()=>{cfg.leds=b.dataset.v==='on';persist();paint();ledSync(true)}});
 document.querySelectorAll('#midiRel .keyb').forEach(b=>{b.onclick=()=>{cfg.rel=b.dataset.v==='rel';persist();paint()}});
 $('mRowPrev').onclick=()=>selectRow(cfg.row-1);$('mRowNext').onclick=()=>selectRow(cfg.row+1);$('mRowSel').onclick=()=>selectRow(cfg.row+1);
 document.querySelectorAll('.trk').forEach(t=>{const n=t.querySelector('.name');if(n)n.addEventListener('click',()=>{if(access&&inputs.length)selectRow(+t.dataset.row)})});
@@ -2012,7 +2029,7 @@ document.addEventListener('keydown',e=>{if(learn&&e.key==='Escape')setLearn(fals
   if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='BeatStep layout';b.classList.remove('armed')},3000);return}
   clearTimeout(arm);arm=null;b.textContent='BeatStep layout';b.classList.remove('armed');cfg.map=defMap();persist();renderKnobs();msg('Knobs are back on the BeatStep layout. MIDI learn links are cleared.')}}
 ['tabA','tabB','clear','copy','preset','newPat'].forEach(id=>{const el=$(id);if(el)el.addEventListener(id==='preset'?'change':'click',()=>setTimeout(paintRow,0))});
-setInterval(()=>{if(!sec.hidden)renderPads()},400);
+setInterval(()=>{if(!sec.hidden)renderPads();ledSync()},300);
 paint();msg('Plug in a USB MIDI controller like the BeatStep, then tap Connect.');
 if(cfg.on)connect();
 if(document.body.dataset.pg==='midi')setPage('midi');
