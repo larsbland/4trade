@@ -531,6 +531,41 @@ select{font-family:var(--silkface);font-weight:600;font-size:.9rem}
 .lmnote .lbl{color:#ff9a16;margin-right:8px}
 body.loopmode .lmnote{display:block}
 body.loopmode #grid{opacity:.35}
+
+/* ---------- MIDI controller ---------- */
+.pgtab[data-pg="midi"].live::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:1px;background:#ff9a16;box-shadow:0 0 6px rgba(255,150,20,.8)}
+.trk.midisel .name{color:#ff9a16;text-shadow:0 0 6px rgba(255,150,20,.45)}
+.trk.midisel .steps{outline:1px solid rgba(255,154,22,.6);outline-offset:3px;border-radius:3px}
+.midisec{gap:14px}
+.midirow{display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-end}
+.midirow .ctl{flex:0 1 auto}
+.midirow .ctl.rowpick{flex:1 1 260px;max-width:420px}
+.bsmap{display:flex;flex-direction:column;gap:6px}
+.bsk,.bsp{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.bsc{background:#150d02;box-shadow:inset 0 2px 5px #000,0 0 0 1px #4b4743;border-radius:3px;padding:5px 6px;min-height:40px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.bsc .bn{font-family:var(--mono);font-size:10px;color:#8d826f;line-height:1}
+.bsc .bt{font-size:.74rem;font-weight:600;color:var(--led-g);line-height:1.1;overflow-wrap:anywhere}
+.bsc.none .bt{color:#5a4a33}
+.bsp .bsc{min-height:34px;--c:#4b4743}
+.bsp .bsc.on{background:linear-gradient(180deg,color-mix(in srgb,var(--c) 85%,#fff),var(--c) 55%,color-mix(in srgb,var(--c) 80%,#000))}
+.bsp .bsc.on .bn,.bsp .bsc.on .bt{color:#150d02}
+.bsp .bsc.ghost{background:color-mix(in srgb,var(--c) 38%,#150d02)}
+.bsp .bsc.inst .bt{color:color-mix(in srgb,var(--c) 70%,#fff)}
+.bsp .bsc.inst{box-shadow:inset 0 2px 5px #000,0 0 0 1px var(--c)}
+.midimap{font-size:.76rem;color:var(--silk-dim);line-height:1.6}
+.midimap b{color:var(--silk);font-weight:700}
+#midiSec .edit{display:flex;gap:8px;flex-wrap:wrap}
+#midiSec .keys .keyb{min-width:0;padding:15px 12px 5px}
+.kctl.midihit .kcap{box-shadow:0 0 0 2px #1a1917,0 0 0 4px #ff9a16,0 0 10px 3px rgba(255,150,20,.5)}
+body.midilearn .kctl .knob,body.midilearn #play,body.midilearn #zeroBtn,body.midilearn #bdn,body.midilearn #bup,body.midilearn #tabA,body.midilearn #tabB,body.midilearn #playA,body.midilearn #playB,body.midilearn [data-learn]{outline:2px dashed rgba(255,154,22,.75);outline-offset:3px;border-radius:50%}
+body.midilearn #play,body.midilearn #zeroBtn,body.midilearn #bdn,body.midilearn #bup,body.midilearn #tabA,body.midilearn #tabB,body.midilearn #playA,body.midilearn #playB,body.midilearn [data-learn]{border-radius:3px}
+body.midilearn .learntgt:not(.kctl),body.midilearn .learntgt .knob{outline:3px solid #ff9a16!important;animation:learnblink .8s steps(2,start) infinite}
+@keyframes learnblink{50%{outline-color:rgba(255,154,22,.25)}}
+.learnbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;display:flex;gap:14px;align-items:center;width:max-content;max-width:calc(100% - 32px);box-sizing:border-box;
+  padding:10px 12px 10px 16px;background:#150d02;color:#ece4d0;font-size:.86rem;line-height:1.35;border-radius:4px;box-shadow:0 0 0 2px #ff9a16,0 8px 24px rgba(0,0,0,.6)}
+.learnbar #learnTxt{color:#ff9a16}
+@media (max-width:560px){.bsk,.bsp{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.bsc{min-height:34px}.bsc .bt{font-size:.7rem}}
+@media (max-width:480px){.pgtabs.hasmidi .pgtab:not([data-pg="help"]){font-size:.64rem;letter-spacing:.02em;padding:0 2px}}
 </style>
 
 <div class="wrap">
@@ -1662,7 +1697,7 @@ function takeSlot(){const i=pendingSlot;pendingSlot=-1;if(slots[i]){applySnap(sl
 /* ---------- pages ---------- */
 const PAGES=[['play','Play'],['mixer','Mixer'],['samples','Samples'],['loops','Loops'],['record','Record'],['help','Help']];
 function setPage(pg){
-  const map={play:['.playhead','.lmnote','#grid','.ruler','.favrow'],mixer:['#mixer'],samples:['#kitBlock'],loops:['#loopSec'],record:['#recSec'],help:['.helppg']};
+  const map={play:['.playhead','.lmnote','#grid','.ruler','.favrow'],mixer:['#mixer'],samples:['#kitBlock'],loops:['#loopSec'],record:['#recSec'],midi:['#midiSec'],help:['.helppg']};
   if(!map[pg])pg='play';if(typeof browserRow!=='undefined'&&browserRow)closeBrowser();
   Object.entries(map).forEach(([k,sels])=>sels.forEach(q=>{const el=document.querySelector(q);if(el)el.hidden=k!==pg}));
   $('kitSec').hidden=!['samples','loops','record'].includes(pg);
@@ -1814,6 +1849,174 @@ $('savePat').onclick=()=>{if(!$('patName').value.trim()){$('patName').focus();$(
 $('copy').onclick=()=>{pats.b=pats.a.map(r=>r.slice());if(editing==='b')paintAll();save()};
 $('clear').onclick=()=>{pats[editing]=blank();paintAll();save()};
 document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target===document.body){e.preventDefault();playing?stop():start()}});
+
+/* ---------- MIDI controller (Arturia BeatStep layout by default, MIDI learn for anything) ---------- */
+(function midiSetup(){
+if(!navigator.requestMIDIAccess){if(document.body.dataset.pg==='midi')setPage('play');return}
+/* BeatStep factory CCs: top row of knobs, then bottom row. Pads 1-8 send notes 44-51, pads 9-16 send 36-43. */
+const BS_TOP=[7,74,71,76,77,93,73,75],BS_BOT=[114,18,19,16,17,91,79,72];
+const FEEL=['bpm','swing','hum','varA','varB','ghost','clickVol','vol'];
+const BTN_IDS=['play','zeroBtn','bdn','bup','tabA','tabB','playA','playB'];
+const BTN_NAMES={play:'Start / stop',zeroBtn:'Straight',bdn:'Tempo −',bup:'Tempo +',tabA:'Edit groove',tabB:'Edit solo',playA:'Groove on/off',playB:'Solo on/off'};
+const defMap=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'lv_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:FEEL[i]}});m['cc:1']={t:'rowsel'};return m};
+const MK='4trade_midi';
+let cfg={on:false,map:defMap(),rel:false,pads:'steps',row:6};
+try{const s=JSON.parse(localStorage.getItem(MK));if(s&&typeof s==='object')cfg={...cfg,...s,map:s.map&&typeof s.map==='object'?s.map:defMap()}}catch(e){}
+cfg.row=Math.max(0,Math.min(ROWS.length-1,cfg.row|0));
+const persist=()=>{try{localStorage.setItem(MK,JSON.stringify(cfg))}catch(e){}};
+let access=null,inputs=[],learn=false,learnTgt=null;const acc={};
+
+/* ---- UI ---- */
+const sec=document.createElement('div');sec.className='subsec midisec';sec.id='midiSec';sec.hidden=true;
+sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><span class="kitbtns"><button class="btn ledbtn" id="midiOn" type="button" aria-pressed="false">Connect</button></span></div>
+<div class="libmsg" id="midiMsg" aria-live="polite"></div>
+<div class="midirow">
+ <div class="ctl"><span class="lbl">Pads</span><div class="keys" id="midiPads" role="radiogroup" aria-label="What the pads do">
+  <button type="button" class="keyb" data-v="steps" role="radio"><span class="kl"></span><span class="kt">Steps</span></button>
+  <button type="button" class="keyb" data-v="play" role="radio"><span class="kl"></span><span class="kt">Play sounds</span></button></div></div>
+ <div class="ctl"><span class="lbl">Knobs send</span><div class="keys" id="midiRel" role="radiogroup" aria-label="How the knobs send their values">
+  <button type="button" class="keyb" data-v="abs" role="radio"><span class="kl"></span><span class="kt">Absolute</span></button>
+  <button type="button" class="keyb" data-v="rel" role="radio"><span class="kl"></span><span class="kt">Relative</span></button></div></div>
+ <div class="ctl rowpick"><span class="lbl">Pads edit this row</span>
+  <div class="krow loopsel"><button class="kstep" id="mRowPrev" type="button" aria-label="Previous row">◀</button><button class="ksel" id="mRowSel" type="button" data-learn="rowsel" aria-label="Row the pads edit"><span class="ks" id="mRowName"></span><span class="kc" id="mRowInfo"></span></button><button class="kstep" id="mRowNext" type="button" aria-label="Next row">▶</button></div></div>
+</div>
+<div class="bsmap"><span class="lbl">Knobs</span><div class="bsk" id="bsKnobs"></div></div>
+<div class="bsmap"><span class="lbl" id="bsPadsLbl">Pads</span><div class="bsp" id="bsPads"></div></div>
+<div class="midimap" id="midiExtra"></div>
+<div class="edit"><button class="btn ledbtn" id="midiLearn" type="button" aria-pressed="false">MIDI learn</button><button class="btn" id="midiReset" type="button">BeatStep layout</button></div>`;
+document.querySelector('.helppg').before(sec);
+{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h)}
+const tab=document.createElement('button');tab.type='button';tab.className='pgtab';tab.dataset.pg='midi';tab.textContent='MIDI';tab.onclick=()=>setPage('midi');
+{const hp=document.querySelector('.pgtab[data-pg="help"]');hp?hp.before(tab):document.querySelector('.pgtabs').append(tab);tab.parentElement.classList.add('hasmidi')}
+const learnBar=document.createElement('div');learnBar.className='learnbar';learnBar.hidden=true;learnBar.setAttribute('role','status');
+learnBar.innerHTML='<span id="learnTxt"></span><button class="btn" id="learnDone" type="button">Done</button>';document.body.append(learnBar);
+
+const msg=t=>{$('midiMsg').textContent=t};
+const lmsg=t=>{$('learnTxt').textContent=t};
+const padIndex=n=>n>=44&&n<=51?n-44:n>=36&&n<=43?n-36+8:-1;
+function tname(m){if(!m)return'—';if(m.t==='rowsel')return'Pads edit row';if(m.t==='btn')return BTN_NAMES[m.id]||m.id;
+  const id=m.id||'';const r=ROWS.find(x=>id==='lv_'+x.id||id==='pan_'+x.id);if(r)return r.name+(id.startsWith('lv_')?' level':' pan');
+  const l=document.querySelector(`label[for="${id}"]`);return l?(l.firstChild?l.firstChild.textContent:l.textContent).trim():id}
+function cname(key){const [k,v]=key.split(':'),n=+v;
+  if(k==='cc'){const a=BS_TOP.indexOf(n),b=BS_BOT.indexOf(n);return a>=0?'Knob '+(a+1):b>=0?'Knob '+(b+9):n===1?'CC 1 (big knob, once it’s set to CC 1)':'CC '+n}
+  const p=padIndex(n);return p>=0?'Pad '+(p+1):'Note '+n}
+const same=(a,b)=>a.t===b.t&&(a.id||'')===(b.id||'');
+
+function renderKnobs(){const el=$('bsKnobs');el.innerHTML='';[...BS_TOP,...BS_BOT].forEach((cc,i)=>{const m=cfg.map['cc:'+cc];
+  const d=document.createElement('div');d.className='bsc'+(m?'':' none');d.innerHTML='<span class="bn"></span><span class="bt"></span>';
+  d.querySelector('.bn').textContent=i+1;d.querySelector('.bt').textContent=tname(m);el.append(d)});
+  const fac=new Set([...BS_TOP,...BS_BOT].map(c=>'cc:'+c)),extra=Object.entries(cfg.map).filter(([k])=>!fac.has(k));
+  const x=$('midiExtra');x.innerHTML='';
+  if(extra.length){const t=document.createElement('div');t.innerHTML='<b>Also linked</b>';x.append(t);
+    extra.forEach(([k,m])=>{const d=document.createElement('div');d.textContent=cname(k)+' → '+tname(m);x.append(d)})}}
+function renderPads(){const el=$('bsPads');if(!el)return;el.innerHTML='';const playMode=cfg.pads==='play',r=ROWS[cfg.row],row=pats[editing][cfg.row];
+  $('bsPadsLbl').textContent=playMode?'Pads play':'Pads · '+r.name+' · '+(editing==='a'?'groove':'solo');
+  for(let p=0;p<16;p++){const d=document.createElement('div');d.className='bsc';d.innerHTML='<span class="bn"></span><span class="bt"></span>';d.querySelector('.bn').textContent=p+1;
+    if(playMode){const rr=ROWS[p];if(p<ROWS.length){d.classList.add('inst');d.style.setProperty('--c',`var(--${rr.id})`);d.querySelector('.bt').textContent=rr.name}else{d.classList.add('none');d.querySelector('.bt').textContent='—'}}
+    else{d.style.setProperty('--c',`var(--${r.id})`);const v=row[p];if(v)d.classList.add(v===2?'ghost':'on');d.querySelector('.bt').textContent=v===2?'ghost':v?'hit':''}
+    el.append(d)}}
+function paintRow(){const live=!!(access&&inputs.length);
+  document.querySelectorAll('.trk').forEach(t=>t.classList.toggle('midisel',live&&cfg.pads==='steps'&&+t.dataset.row===cfg.row));
+  const r=ROWS[cfg.row];$('mRowName').textContent=r.name;$('mRowInfo').textContent='Row '+(cfg.row+1)+' of '+ROWS.length+' · '+(editing==='a'?'groove':'solo');renderPads()}
+function paint(){const on=!!access;$('midiOn').setAttribute('aria-pressed',on);$('midiOn').textContent=on?'Connected':'Connect';
+  tab.classList.toggle('live',!!(access&&inputs.length));
+  document.querySelectorAll('#midiPads .keyb').forEach(b=>{const s=b.dataset.v===cfg.pads;b.classList.toggle('on',s);b.setAttribute('aria-checked',s)});
+  document.querySelectorAll('#midiRel .keyb').forEach(b=>{const s=(b.dataset.v==='rel')===!!cfg.rel;b.classList.toggle('on',s);b.setAttribute('aria-checked',s)});
+  $('midiLearn').setAttribute('aria-pressed',learn);renderKnobs();paintRow()}
+function selectRow(i){cfg.row=(i+ROWS.length)%ROWS.length;persist();paintRow()}
+
+/* ---- audio helpers ---- */
+function audioOk(){if(ctx&&ctx.state==='running')return true;
+  if(navigator.userActivation&&!navigator.userActivation.hasBeenActive){msg('Click anywhere in 4TRADE once so the browser lets it make sound, then try again.');return false}
+  return true}
+function wakeAudio(){if(!audioOk())return;ensureAudio().then(()=>loadKitBuffers()).catch(()=>{})}
+function transport(on){if(on&&!playing){if(audioOk())start()}else if(!on&&playing)stop()}
+
+/* ---- incoming messages ---- */
+function onMsg(e){const d=e.data;if(!d||!d.length)return;const s=d[0];
+  if(s===0xF0){if(d.length>=6&&d[1]===0x7F&&d[3]===0x06){const c=d[4];if(c===2||c===3)transport(true);else if(c===1||c===9)transport(false)}return}
+  if(s===0xFA||s===0xFB){transport(true);return}if(s===0xFC){transport(false);return}if(s>0xEF||d.length<3)return;
+  const type=s&0xF0,ch=s&0x0F;
+  if(type===0x90&&d[2]>0)onNote(d[1],d[2],ch);else if(type===0xB0)onCC(d[1],d[2])}
+function onNote(n,v,ch){const key='note:'+n;
+  if(learn&&learnTgt){assign(key,'note');return}
+  const m=cfg.map[key];if(m){act(m,127);return}
+  const p=padIndex(n);if(p<0)return;
+  if(cfg.pads==='play'||ch===1)playPad(p,v);else stepPad(p,v)}
+function onCC(n,v){const key='cc:'+n;
+  if(learn&&learnTgt){assign(key,'cc');return}
+  const m=cfg.map[key];if(m)act(m,v,key)}
+function act(m,v,key){
+  if(m.t==='range'){if(key)setRange(m.id,v)}
+  else if(m.t==='rowsel'){if(!key)return selectRow(cfg.row+1);
+    if(cfg.rel){acc[key]=(acc[key]||0)+(v-64);while(acc[key]>=2){acc[key]-=2;if(cfg.row<ROWS.length-1)selectRow(cfg.row+1)}while(acc[key]<=-2){acc[key]+=2;if(cfg.row>0)selectRow(cfg.row-1)}}
+    else{const i=Math.min(ROWS.length-1,Math.floor(v*ROWS.length/128));if(i!==cfg.row)selectRow(i)}}
+  else if(m.t==='btn'&&v>=64){if(m.id==='play'){playing?stop():transport(true)}else{const b=$(m.id);if(b)b.click()}}}
+function setRange(id,v){const inp=$(id);if(!inp)return;const mn=+inp.min,mx=+inp.max;let x;
+  if(cfg.rel){const d=v-64;if(!d)return;x=+inp.value+d*Math.max(1,Math.round((mx-mn)/128))}else x=mn+v/127*(mx-mn);
+  x=Math.max(mn,Math.min(mx,Math.round(x)));if(String(x)===inp.value)return;
+  inp.value=x;inp.dispatchEvent(new Event('input'));
+  const k=inp.closest('.kctl');if(k){k.classList.add('midihit');clearTimeout(k._mh);k._mh=setTimeout(()=>k.classList.remove('midihit'),180)}}
+function stepPad(k,v){const i=cfg.row,p=pats[editing];
+  p[i][k]=p[i][k]?0:(v<=50?2:1);paintCell(i,k);cells[i][k].classList.remove('add','drop');save();
+  try{motif[editing]=null;if(playing&&curPat&&sectionFor(bar)===editing)curPat[i][k]=p[i][k]}catch(e){}
+  if(p[i][k]&&!playing){if(ctx&&ctx.state==='running')hit(ROWS[i].id,ctx.currentTime+0.005,p[i][k]===2?GHOST:1);else wakeAudio()}
+  renderPads()}
+function playPad(p,v){if(p>=ROWS.length)return;
+  if(!ctx||ctx.state!=='running'){wakeAudio();return}
+  hit(ROWS[p].id,ctx.currentTime+0.003,Math.max(0.08,v/127))}
+
+/* ---- MIDI learn ---- */
+function setLearn(on){learn=on;learnTgt=null;document.body.classList.toggle('midilearn',on);learnBar.hidden=!on;
+  document.querySelectorAll('.learntgt').forEach(e=>e.classList.remove('learntgt'));
+  if(on)lmsg(access&&inputs.length?'MIDI learn: tap a knob or button in 4TRADE, then move a control on your controller.':'MIDI learn: connect a controller first, on the MIDI page.');
+  paint()}
+function learnTarget(el){if(!el||!el.closest||el.closest('.learnbar'))return null;
+  const k=el.closest('.kctl');if(k){const inp=k.querySelector('input[type=range]');if(inp&&inp.id)return{tgt:{t:'range',id:inp.id},el:k}}
+  const r=el.closest('[data-learn="rowsel"]');if(r)return{tgt:{t:'rowsel'},el:r};
+  const b=el.closest('button');if(b&&BTN_IDS.includes(b.id))return{tgt:{t:'btn',id:b.id},el:b};return null}
+function grab(e){if(!learn)return;const t=learnTarget(e.target);if(!t)return;e.preventDefault();e.stopPropagation();
+  if(e.type!=='click'||!learnTgt||!same(learnTgt,t.tgt)){learnTgt=t.tgt;document.querySelectorAll('.learntgt').forEach(x=>x.classList.remove('learntgt'));t.el.classList.add('learntgt');
+    lmsg(tname(t.tgt)+': now '+(t.tgt.t==='range'||t.tgt.t==='rowsel'?'turn a knob':'press a pad or button')+' on your controller.')}}
+['pointerdown','mousedown','touchstart','click'].forEach(ev=>document.addEventListener(ev,grab,{capture:true,passive:false}));
+function assign(key,kind){const t=learnTgt;
+  if(t.t==='range'&&kind==='note'){lmsg('That was a pad. Turn a knob to link it to '+tname(t)+'.');return}
+  Object.keys(cfg.map).forEach(k=>{if(same(cfg.map[k],t))delete cfg.map[k]});cfg.map[key]=t;persist();
+  const steal=kind==='note'&&padIndex(+key.split(':')[1])>=0?' That pad no longer edits steps.':'';
+  lmsg(cname(key)+' → '+tname(t)+'.'+steal+' Tap another control, or Done.');
+  learnTgt=null;document.querySelectorAll('.learntgt').forEach(x=>x.classList.remove('learntgt'));renderKnobs()}
+
+/* ---- connect ---- */
+function wire(){if(!access)return;inputs=[...access.inputs.values()].filter(i=>i.state!=='disconnected');inputs.forEach(i=>{i.onmidimessage=onMsg});
+  if(!inputs.length)msg('MIDI is on. Plug in the BeatStep (or any USB MIDI controller) and it will show up here.');
+  else{const names=inputs.map(i=>i.name||'MIDI device').join(', ');
+    msg('Connected: '+names+'.'+(!access.sysexEnabled&&/beatstep/i.test(names)?' Play and Stop on the BeatStep need full MIDI access: allow it in this site’s settings (the icon left of the address bar), then reload.':''))}
+  paint()}
+async function connect(){if(typeof framed!=='undefined'&&framed){msg('MIDI works in the standalone version of 4TRADE.');return}
+  msg('Asking the browser for MIDI access…');
+  try{access=await navigator.requestMIDIAccess({sysex:true})}
+  catch(e){try{access=await navigator.requestMIDIAccess()}catch(e2){access=null;cfg.on=false;persist();paint();
+    msg('MIDI access was blocked. Allow MIDI for this site in the browser’s site settings, then tap Connect.');return}}
+  cfg.on=true;persist();access.onstatechange=wire;wire()}
+function disconnect(){inputs.forEach(i=>{i.onmidimessage=null});if(access)access.onstatechange=null;access=null;inputs=[];cfg.on=false;persist();setLearn(false);msg('MIDI is off.');paint()}
+
+/* ---- wire up ---- */
+$('midiOn').onclick=()=>{if(access)disconnect();else{wakeAudio();connect()}};
+document.querySelectorAll('#midiPads .keyb').forEach(b=>{b.onclick=()=>{cfg.pads=b.dataset.v;persist();paint()}});
+document.querySelectorAll('#midiRel .keyb').forEach(b=>{b.onclick=()=>{cfg.rel=b.dataset.v==='rel';persist();paint()}});
+$('mRowPrev').onclick=()=>selectRow(cfg.row-1);$('mRowNext').onclick=()=>selectRow(cfg.row+1);$('mRowSel').onclick=()=>selectRow(cfg.row+1);
+document.querySelectorAll('.trk').forEach(t=>{const n=t.querySelector('.name');if(n)n.addEventListener('click',()=>{if(access&&inputs.length)selectRow(+t.dataset.row)})});
+$('midiLearn').onclick=()=>setLearn(!learn);$('learnDone').onclick=()=>setLearn(false);
+document.addEventListener('keydown',e=>{if(learn&&e.key==='Escape')setLearn(false)});
+{let arm=null;const b=$('midiReset');b.onclick=()=>{
+  if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='BeatStep layout';b.classList.remove('armed')},3000);return}
+  clearTimeout(arm);arm=null;b.textContent='BeatStep layout';b.classList.remove('armed');cfg.map=defMap();persist();renderKnobs();msg('Knobs are back on the BeatStep layout. MIDI learn links are cleared.')}}
+['tabA','tabB','clear','copy','preset','newPat'].forEach(id=>{const el=$(id);if(el)el.addEventListener(id==='preset'?'change':'click',()=>setTimeout(paintRow,0))});
+setInterval(()=>{if(!sec.hidden)renderPads()},400);
+paint();msg('Plug in a USB MIDI controller like the BeatStep, then tap Connect.');
+if(cfg.on)connect();
+if(document.body.dataset.pg==='midi')setPage('midi');
+})();
 </script>
 
 </body></html>
