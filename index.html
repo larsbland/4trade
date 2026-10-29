@@ -666,7 +666,7 @@ body.midilearn .learntgt:not(.kctl),body.midilearn .learntgt .knob{outline:3px s
     <div class="kit" id="kitSec">
       <div class="subsec" id="kitBlock">
         <div class="bankhead"><span class="lbl">Kit</span><select id="loadPack" aria-label="Load a whole pack onto the kit" hidden></select>
-          <span class="kitbtns"><button class="btn" id="kitReset" type="button">All built-in</button><label class="btn" for="fFiles">Import one-shots</label><label class="btn" for="fDir">Folder</label></span></div>
+          <span class="kitbtns"><button class="btn ledbtn" id="kit808" type="button" aria-pressed="false">808 kit</button><button class="btn" id="kitReset" type="button">All built-in</button><label class="btn" for="fFiles">Import one-shots</label><label class="btn" for="fDir">Folder</label></span></div>
         <input type="file" id="fFiles" accept=".zip,application/zip,audio/*,.wav,.aif,.aiff,.mp3,.m4a,.flac,.ogg" multiple hidden>
         <input type="file" id="fDir" webkitdirectory multiple hidden>
         <div class="libinfo"><span id="libinfo"></span><button class="btn" id="libClear" hidden>Clear kit library</button></div>
@@ -1071,13 +1071,55 @@ function synthPerc(k,t){const j=()=>Math.random()*0.004;
   case 'cabasa':grain(t,7200,7,0.5,0.012,0.08);grain(t,10500,1,0.12,0.012,0.06,'highpass');break;
   case 'maraca':grain(t,7400,1.6,0.38,0.003,0.03);grain(t+0.014+j(),7000,1.6,0.3,0.003,0.03);break;
   }}
-const SYNMETA=Object.entries(SYN).map(([k,n])=>({id:'syn:'+k,name:n,cat:'syn',path:'Built-in/'+n,kind:'kit'}));
+/* ---------- 808: every voice synthesized the way the TR-808's circuits make it (no samples) ----------
+   tune: semitones; dm: decay multiplier. Recipes: bridged-T sine kick, two-oscillator snare + "snappy" noise,
+   six detuned square oscillators for hats/cymbal, two squares through a band-pass for the cowbell. */
+const S808={bd:['808 Kick','kick',['kick','perc']],sd:['808 Snare','snare',['snare']],cp:['808 Clap','clap',['clap','snare']],rs:['808 Rimshot','snare',['snare','perc']],
+  ch:['808 Closed hat','hat',['hat']],oh:['808 Open hat','ohat',['ohat','hat']],cy:['808 Cymbal','ohat',['ohat']],cb:['808 Cowbell','perc',['perc']],cl:['808 Claves','perc',['perc']],
+  hc:['808 High conga','perc',['perc']],mc:['808 Mid conga','perc',['perc']],lc:['808 Low conga','perc',['perc']],
+  ht:['808 High tom','perc',['perc']],mt:['808 Mid tom','perc',['perc']],lt:['808 Low tom','perc',['perc','kick']],ma:['808 Maracas','perc',['perc','hat']]};
+const KIT808={kick:'bd',snare:'sd',clap:'cp',chat:'ch',ohat:'oh',clave:'cl',conga:'hc',tumba:'lc',shaker:'ma'};
+const METAL=[205.3,304.4,369.6,522.7,540,800];
+function metal(t,dur,tn){const sum=gain();sum.gain.value=0.16;METAL.forEach(f=>{const o=osc('square',t,dur);o.frequency.value=f*tn;o.connect(sum)});return sum}
+function tr808(k,t,tune=0,dm=1){const tn=Math.pow(2,tune/12),D=x=>x*dm;
+  switch(k){
+  case 'bd':{const f=49*tn,d=D(0.75),o=osc('sine',t,d+0.2),g=gain();
+    o.frequency.setValueAtTime(f*2.7,t);o.frequency.exponentialRampToValueAtTime(f*1.25,t+0.012);o.frequency.exponentialRampToValueAtTime(f,t+0.09);
+    g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(1,t+0.002);g.gain.setTargetAtTime(0.0001,t+0.01,d/4.5);o.connect(g).connect(out);
+    const c=osc('square',t,0.004),cg=gain();c.frequency.value=900;cg.gain.setValueAtTime(0.18,t);cg.gain.exponentialRampToValueAtTime(0.0001,t+0.004);c.connect(filt('lowpass',3500)).connect(cg).connect(out);break}
+  case 'sd':{[[185,0.6,0.16],[330,0.35,0.09]].forEach(([f,p,dd])=>{const o=osc('sine',t,D(dd)+0.05),g=gain();o.frequency.setValueAtTime(f*tn*1.12,t);o.frequency.exponentialRampToValueAtTime(f*tn,t+0.02);env(g,t,p,D(dd));o.connect(g).connect(out)});
+    const n=noise(t,D(0.3)),g=gain();env(g,t,0.42,D(0.2));n.connect(filt('highpass',1800*tn)).connect(filt('lowpass',9000)).connect(g).connect(out);break}
+  case 'cp':{const f=filt('bandpass',1100*tn,1.4);f.connect(out);
+    [0,0.0095,0.019,0.029].forEach((d,i)=>{const n=noise(t+d,0.012),g=gain();env(g,t+d,i===3?2.4:1.8,0.009);n.connect(g).connect(f)});
+    const n=noise(t+0.029,D(0.5)),g=gain();env(g,t+0.029,1.5,D(0.26));n.connect(g).connect(f);break}
+  case 'rs':{const hp=filt('highpass',380);const g=gain();env(g,t,0.6,D(0.028));hp.connect(g).connect(out);
+    [455,1667].forEach(f=>{const o=osc('triangle',t,0.06);o.frequency.value=f*tn;o.connect(hp)});break}
+  case 'ch':case 'oh':case 'cy':{const cy=k==='cy',d=D(k==='ch'?0.045:cy?1.3:0.34),m=metal(t,d+0.05,tn),g=gain();
+    const bp=filt('bandpass',cy?7000:10000,cy?0.6:1.1);env(g,t,cy?1.8:k==='ch'?3.4:3,d);m.connect(bp).connect(filt('highpass',cy?3800:7000)).connect(g).connect(out);
+    if(cy){const lo=metal(t,d*0.6,tn),lg=gain();env(lg,t,0.18,d*0.35);lo.connect(filt('bandpass',3400,1)).connect(lg).connect(out)}
+    if(k==='oh')openHat=g;break}
+  case 'cb':{const sum=gain();sum.gain.value=0.3;[540,800].forEach(f=>{const o=osc('square',t,D(0.5));o.frequency.value=f*tn;o.connect(sum)});
+    const g=gain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(1.4,t+0.001);g.gain.exponentialRampToValueAtTime(0.45,t+0.014);g.gain.exponentialRampToValueAtTime(0.0001,t+D(0.36));
+    sum.connect(filt('bandpass',2640*tn,1.1)).connect(g).connect(out);break}
+  case 'cl':{const o=osc('sine',t,0.12),g=gain();o.frequency.value=2500*tn;env(g,t,0.6,D(0.03));o.connect(g).connect(out);break}
+  case 'hc':case 'mc':case 'lc':case 'ht':case 'mt':case 'lt':{const F={hc:370,mc:250,lc:165,ht:220,mt:150,lt:100}[k],tom=k[1]==='t',d=D(tom?0.34:0.2),o=osc('sine',t,d+0.1),g=gain();
+    o.frequency.setValueAtTime(F*tn*(tom?1.12:1.06),t);o.frequency.exponentialRampToValueAtTime(F*tn,t+(tom?0.06:0.025));env(g,t,0.75,d);o.connect(g).connect(out);
+    if(tom){const n=noise(t,0.06),ng=gain();env(ng,t,0.08,0.04);n.connect(filt('lowpass',F*12)).connect(ng).connect(out)}break}
+  case 'ma':{const n=noise(t,D(0.06)),g=gain();env(g,t,0.42,D(0.028),0.003);n.connect(filt('highpass',5200*tn)).connect(g).connect(out);break}
+  }}
+const SYNMETA=[...Object.entries(SYN).map(([k,n])=>({id:'syn:'+k,name:n,cat:'syn',path:'Built-in/'+n,kind:'kit',fits:['perc','hat','ohat']})),
+  ...Object.entries(S808).map(([k,[n,,fits]])=>({id:'syn:808'+k,name:n,cat:'syn',path:'Built-in/808/'+n,kind:'kit',fits}))];
+const is808=id=>!!(id&&id.startsWith('syn:808'));
+/* tune and decay for whatever sits on a row: an 808 voice, or a sample (pitch by speed, decay by fade) */
+const tuneOf=id=>Math.round((fx[id]&&fx[id].tune||0)*12),decOf=id=>Math.pow(2,(fx[id]&&fx[id].dec||0)*2);
 function voice(id,t){
   if(id==='chat'&&openHat){openHat.gain.cancelScheduledValues(t);openHat.gain.setTargetAtTime(0.0001,t,0.008);openHat=null}
+  if(is808(kit[id])){tr808(kit[id].slice(7),t,tuneOf(id),decOf(id));return}
   if(kit[id]&&kit[id].startsWith('syn:')){synthPerc(kit[id].slice(4),t);return}
   if(id==='shaker'&&!kit[id]){synthPerc('shaker',t);return}
   const sb=kit[id]&&bufs.get(kit[id]);
-  if(sb){const s=ctx.createBufferSource(),g=gain();s.buffer=sb;g.gain.setValueAtTime(1,t);s.connect(g).connect(out);s.start(t);if(id==='ohat')openHat=g;return}
+  if(sb){const s=ctx.createBufferSource(),g=gain();s.buffer=sb;const st=tuneOf(id),dm=decOf(id);if(st)s.playbackRate.value=Math.pow(2,st/12);g.gain.setValueAtTime(1,t);
+    if(dm<0.99){const L=sb.duration/s.playbackRate.value*dm;g.gain.setValueAtTime(1,t+L*0.5);g.gain.exponentialRampToValueAtTime(0.0001,t+L)}s.connect(g).connect(out);s.start(t);if(id==='ohat')openHat=g;return}
   switch(id){
   case 'kick':{const o=osc('sine',t,0.6),g=gain();o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(42,t+0.13);env(g,t,1,0.5);o.connect(g).connect(out);
     const c=noise(t,0.01),cg=gain();env(cg,t,0.25,0.008);c.connect(filt('lowpass',3000)).connect(cg).connect(out);break}
@@ -1105,7 +1147,7 @@ function hit(id,t,vel){if(!(vel*(lv[id]??1)>0))return;const g=gain();g.gain.valu
     o.connect(sg).connect(g);o.start(t);o.stop(t+0.5)}const prev=out;out=g;voice(id,t);out=prev}
 
 /* ---------- per-voice channel: drive → filter → pan, with a room send ---------- */
-const fx=Object.fromEntries(ROWS.map(r=>[r.id,{pan:0,tone:0,drive:0,room:0,sub:0}]));
+const fx=Object.fromEntries(ROWS.map(r=>[r.id,{pan:0,tone:0,drive:0,room:0,sub:0,tune:0,dec:0}]));
 let chan={},roomIn=null,fxSel='kick';
 function buildChannels(){
   const len=Math.floor(ctx.sampleRate*1.6),ir=ctx.createBuffer(2,len,ctx.sampleRate);
@@ -1136,7 +1178,11 @@ function paintFxKnobs(){const f=fx[fxSel];
   $('fxSub').closest('.kctl').classList.toggle('off',fxSel!=='kick');if(fxSel!=='kick')$('fxSubv').textContent='Kick only';
   document.querySelectorAll('#fxVoice .keyb').forEach(b=>{const on=b.dataset.v===fxSel;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)})}
 function selectFxVoice(id){fxSel=id;paintFxKnobs()}
-function paintMix(){ROWS.forEach(r=>{$('pan_'+r.id).value=Math.round(fx[r.id].pan*100);$('pan_'+r.id+'v').textContent=panTxt(Math.round(fx[r.id].pan*100));
+const tuneTxt=v=>{const s=Math.round(v*12/100);return s?(s>0?'+':'')+s+' st':'0 st'},decTxt=v=>v===0?'Normal':'×'+Math.pow(2,v/50).toFixed(2).replace(/\.?0+$/,'');
+function paintTD(r){const f=fx[r.id],ti=$('tune_'+r.id);if(!ti)return;ti.value=Math.round(f.tune*100);$('tune_'+r.id+'v').textContent=tuneTxt(+ti.value);
+  $('dec_'+r.id).value=Math.round(f.dec*100);$('dec_'+r.id+'v').textContent=decTxt(+$('dec_'+r.id).value);
+  const legacy=!(is808(kit[r.id])||(kit[r.id]&&!kit[r.id].startsWith('syn:')));[ti,$('dec_'+r.id)].forEach(i=>{const k=i.closest('.kctl')||i.closest('.ctl');if(k){k.classList.toggle('off',legacy);k.title=legacy?'Tune and Decay work on 808 voices and samples':''}})}
+function paintMix(){ROWS.forEach(r=>{paintTD(r);$('pan_'+r.id).value=Math.round(fx[r.id].pan*100);$('pan_'+r.id+'v').textContent=panTxt(Math.round(fx[r.id].pan*100));
   $('lv_'+r.id).value=Math.round((lv[r.id]??1)*100);$('lv_'+r.id+'v').textContent=Math.round((lv[r.id]??1)*100)+'%'});paintFxKnobs()}
 function loadMix(m){if(!m)return;if(m.lv)ROWS.forEach(r=>{if(m.lv[r.id]!=null)lv[r.id]=m.lv[r.id]});
   if(m.fx)ROWS.forEach(r=>{if(m.fx[r.id])Object.assign(fx[r.id],m.fx[r.id])});ROWS.forEach(r=>applyFx(r.id));paintMix()}
@@ -1399,7 +1445,7 @@ function packList(){return [...new Set(lib.map(packOf))].sort((a,b)=>a.localeCom
 let rowPack={};const packFor=r=>rowPack[r]&&rowPack[r]!=='all'&&packList().includes(rowPack[r])?rowPack[r]:'all';
 function rowList(rowId){if(rowId==='loop')return loopLib;const pk=packFor(rowId),pool=pk==='all'?lib:lib.filter(m=>packOf(m)===pk);
   const c=ROWCAT[rowId],l=pool.filter(m=>m.cat===c),base=l.length?l:pool;
-  return ['perc','hat','ohat'].includes(c)?[...base,...SYNMETA]:base}
+  return [...base,...SYNMETA.filter(m=>m.fits.includes(c))]}
 function autoAssign(){['kick','snare','clap','chat','ohat'].forEach(r=>{if(kit[r]&&libById.has(kit[r]))return;const m=lib.find(x=>x.cat===ROWCAT[r]);if(m)kit[r]=m.id});save();renderKit();loadKitBuffers()}
 async function assign(rowId,id){
   if(rowId==='loop')return setLoopSample(id);
@@ -1410,7 +1456,7 @@ async function assign(rowId,id){
 }
 function stepRow(rowId,dir){const l=rowList(rowId);if(!l.length)return;const i=l.findIndex(m=>m.id===kit[rowId]);
   let j=i+dir;if(j<-1)j=l.length-1;if(j>=l.length)j=-1;assign(rowId,j<0?null:l[j].id)}
-function renderKit(){const el=$('kitrows');el.innerHTML='';try{renderLoadPack()}catch(e){}try{setTimeout(renderKitSlots,0)}catch(e){}
+function renderKit(){const el=$('kitrows');el.innerHTML='';{const b=$('kit808');if(b){const on=Object.entries(KIT808).every(([r,k])=>kit[r]==='syn:808'+k);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)}}try{ROWS.forEach(paintTD)}catch(e){}try{renderLoadPack()}catch(e){}try{setTimeout(renderKitSlots,0)}catch(e){}
   ROWS.forEach(r=>{const m=kit[r.id]&&libById.get(kit[r.id]),l=rowList(r.id),idx=m?l.indexOf(m):-1,cat=ROWCAT[r.id];
     const row=document.createElement('div');row.className='krow'+(m?'':' synth')+(browserRow===r.id?' open':'');row.style.setProperty('--c',`var(--${r.id})`);
     row.innerHTML='<div class="kcol"><button class="kname"></button><select class="kpack"></select></div><button class="kstep" data-d="-1">◀</button><button class="ksel"><span class="ks"></span><span class="kc"></span></button><button class="kstep" data-d="1">▶</button>';
@@ -1719,7 +1765,9 @@ function setPage(pg){
     const nm=document.createElement('div');nm.className='stn lbl';nm.textContent=r.name;
     const L=mk('lv_'+r.id,'Level',0,150,100),P=mk('pan_'+r.id,'Pan',-100,100,0);
     L.querySelector('input').setAttribute('aria-label',r.name+' level');P.querySelector('input').setAttribute('aria-label',r.name+' pan');
-    st.append(nm,L,P);strips.append(st)});
+    const T=mk('tune_'+r.id,'Tune',-100,100,0),Dk=mk('dec_'+r.id,'Decay',-100,100,0);T.querySelector('input').step=100/12;
+    T.querySelector('input').setAttribute('aria-label',r.name+' tune');Dk.querySelector('input').setAttribute('aria-label',r.name+' decay');
+    st.append(nm,L,P,T,Dk);strips.append(st)});
   const vk=document.createElement('div');vk.className='keys';vk.id='fxVoice';vk.setAttribute('role','radiogroup');vk.setAttribute('aria-label','Voice to edit');
   ROWS.forEach(r=>{const b=document.createElement('button');b.type='button';b.className='keyb';b.dataset.v=r.id;b.setAttribute('role','radio');b.style.setProperty('--c',`var(--${r.id})`);
     b.innerHTML='<span class="kl"></span><span class="kt"></span>';b.querySelector('.kt').textContent=r.name.replace('Open hat','O.hat');b.onclick=()=>selectFxVoice(r.id);vk.append(b)});
@@ -1764,6 +1812,9 @@ loadTakes();
 renderLoop();
 $('lpPrev').onclick=()=>stepLoop(-1);$('lpNext').onclick=()=>stepLoop(1);
 $('lpSel').onclick=()=>browserRow==='loop'?closeBrowser():openBrowser('loop');
+$('kit808').onclick=async()=>{Object.entries(KIT808).forEach(([r,k])=>kit[r]='syn:808'+k);save();renderKit();updateSel();
+  setLibMsg('808 kit loaded: every row is a synthesized TR-808 voice. Tune and Decay for each one are on the Mixer page. Use ◀ ▶ on a row for the cowbell, rimshot, cymbal, toms and other congas.');
+  await ensureAudio();if(!playing){const t=ctx.currentTime+0.02;hit('kick',t,1);hit('chat',t+0.18,0.8);hit('snare',t+0.36,1);hit('conga',t+0.54,0.9)}};
 {let arm=null;const b=$('kitReset');b.onclick=()=>{
   if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='All built-in';b.classList.remove('armed')},3000);return}
   clearTimeout(arm);arm=null;b.textContent='All built-in';b.classList.remove('armed');
@@ -1820,6 +1871,8 @@ function setPct(id,v){$(id).value=v;$(id+'v').textContent=Math.round(v)+'%'}
 $('vol').oninput=e=>{masterVol=+e.target.value/100;$('volv').textContent=e.target.value+'%';if(master)master.gain.value=masterVol;save()};
 $('ghost').oninput=e=>{GHOST=+e.target.value/100;$('ghostv').textContent=e.target.value+'%';save()};
 ROWS.forEach(r=>{$('lv_'+r.id).oninput=e=>{lv[r.id]=+e.target.value/100;$('lv_'+r.id+'v').textContent=e.target.value+'%';save()};
+  $('tune_'+r.id).oninput=e=>{fx[r.id].tune=Math.round(+e.target.value*12/100)/12;paintTD(r);save()};
+  $('dec_'+r.id).oninput=e=>{fx[r.id].dec=+e.target.value/100;paintTD(r);save()};
   $('pan_'+r.id).oninput=e=>{fx[r.id].pan=+e.target.value/100;$('pan_'+r.id+'v').textContent=panTxt(+e.target.value);applyFx(r.id);save()}});
 $('fxTone').oninput=e=>{fx[fxSel].tone=+e.target.value/100;$('fxTonev').textContent=toneTxt(+e.target.value);applyFx(fxSel);save()};
 $('fxDrive').oninput=e=>{fx[fxSel].drive=+e.target.value/100;$('fxDrivev').textContent=e.target.value+'%';applyFx(fxSel);save()};
@@ -1860,6 +1913,7 @@ const FEEL=['bpm','swing','hum','varA','varB','ghost','clickVol','vol'];
 const BTN_IDS=['play','zeroBtn','bdn','bup','tabA','tabB','playA','playB'];
 const BTN_NAMES={play:'Start / stop',zeroBtn:'Straight',bdn:'Tempo −',bup:'Tempo +',tabA:'Edit groove',tabB:'Edit solo',playA:'Groove on/off',playB:'Solo on/off'};
 const defMap=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'lv_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:FEEL[i]}});m['cc:1']={t:'rowsel'};return m};
+const map808=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'tune_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'dec_'+ROWS[i].id}});m['cc:1']={t:'rowsel'};return m};
 const MK='4trade_midi';
 let cfg={on:false,map:defMap(),rel:false,pads:'steps',row:6,leds:true};
 try{const s=JSON.parse(localStorage.getItem(MK));if(s&&typeof s==='object')cfg={...cfg,...s,map:s.map&&typeof s.map==='object'?s.map:defMap()}}catch(e){}
@@ -1889,9 +1943,9 @@ sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><sp
 <div class="bsmap"><span class="lbl" id="bsPadsLbl">Pads</span><div class="bsp" id="bsPads"></div></div>
 <div class="midimap" id="midiExtra"></div>
 <div class="bsmap"><span class="lbl">Last notes in</span><div class="libmsg midimon" id="midiMon">None yet.</div></div>
-<div class="edit"><button class="btn ledbtn" id="midiLearn" type="button" aria-pressed="false">MIDI learn</button><button class="btn" id="midiReset" type="button">BeatStep layout</button></div>`;
+<div class="edit"><button class="btn ledbtn" id="midiLearn" type="button" aria-pressed="false">MIDI learn</button><button class="btn" id="midiReset" type="button">BeatStep layout</button><button class="btn" id="midi808" type="button">808 knobs</button></div>`;
 document.querySelector('.helppg').before(sec);
-{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. With Pad lights on, the BeatStep’s pads light up to match the steps on that row, and a light runs across them as the groove plays. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h)}
+{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. With Pad lights on, the BeatStep’s pads light up to match the steps on that row, and a light runs across them as the groove plays. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h);const h2=document.createElement('p');h2.className='hint';h2.textContent='808: tap 808 kit on the Samples page and every row becomes a TR-808 voice, synthesized the way the original circuits make it. Each row’s ◀ ▶ also has the cowbell, rimshot, cymbal, toms and the other congas. Tune and Decay for every voice are on the Mixer page; they also work on samples. On the MIDI page, 808 knobs puts tune on the BeatStep’s top row and decay on the bottom row; BeatStep layout puts levels and feel back. Set the pads to Play sounds to play the 808 live.';document.querySelector('.helppg').append(h2)}
 const tab=document.createElement('button');tab.type='button';tab.className='pgtab';tab.dataset.pg='midi';tab.textContent='MIDI';tab.onclick=()=>setPage('midi');
 {const hp=document.querySelector('.pgtab[data-pg="help"]');hp?hp.before(tab):document.querySelector('.pgtabs').append(tab);tab.parentElement.classList.add('hasmidi')}
 const learnBar=document.createElement('div');learnBar.className='learnbar';learnBar.hidden=true;learnBar.setAttribute('role','status');
@@ -1904,7 +1958,7 @@ const monLog=[];function mon(port,d,note){const NN=['C','C#','D','D#','E','F','F
 const lmsg=t=>{$('learnTxt').textContent=t};
 const padIndex=n=>n>=44&&n<=51?n-44:n>=36&&n<=43?n-36+8:-1;
 function tname(m){if(!m)return'—';if(m.t==='rowsel')return'Pads edit row';if(m.t==='btn')return BTN_NAMES[m.id]||m.id;
-  const id=m.id||'';const r=ROWS.find(x=>id==='lv_'+x.id||id==='pan_'+x.id);if(r)return r.name+(id.startsWith('lv_')?' level':' pan');
+  const id=m.id||'';const r=ROWS.find(x=>['lv_','pan_','tune_','dec_'].some(p=>id===p+x.id));if(r)return r.name+' '+{lv:'level',pan:'pan',tune:'tune',dec:'decay'}[id.split('_')[0]];
   const l=document.querySelector(`label[for="${id}"]`);return l?(l.firstChild?l.firstChild.textContent:l.textContent).trim():id}
 function cname(key){const [k,v]=key.split(':'),n=+v;
   if(k==='cc'){const a=BS_TOP.indexOf(n),b=BS_BOT.indexOf(n);return a>=0?'Knob '+(a+1):b>=0?'Knob '+(b+9):n===1?'CC 1 (big knob, once it’s set to CC 1)':'CC '+n}
@@ -2038,6 +2092,7 @@ document.addEventListener('keydown',e=>{if(learn&&e.key==='Escape')setLearn(fals
 {let arm=null;const b=$('midiReset');b.onclick=()=>{
   if(!arm){b.textContent='Tap again to reset';b.classList.add('armed');arm=setTimeout(()=>{arm=null;b.textContent='BeatStep layout';b.classList.remove('armed')},3000);return}
   clearTimeout(arm);arm=null;b.textContent='BeatStep layout';b.classList.remove('armed');cfg.map=defMap();persist();renderKnobs();msg('Knobs are back on the BeatStep layout. MIDI learn links are cleared.')}}
+$('midi808').onclick=()=>{cfg.map=map808();persist();renderKnobs();msg('808 knobs: the top row tunes kick, snare, clap, hat, open hat, clave, conga and tumba; the bottom row sets their decay. BeatStep layout puts levels and feel back.')};
 ['tabA','tabB','clear','copy','preset','newPat'].forEach(id=>{const el=$(id);if(el)el.addEventListener(id==='preset'?'change':'click',()=>setTimeout(paintRow,0))});
 setInterval(()=>{if(!sec.hidden)renderPads();ledSync()},300);
 paint();msg('Plug in a USB MIDI controller like the BeatStep, then tap Connect.');
