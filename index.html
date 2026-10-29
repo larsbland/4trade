@@ -1908,16 +1908,18 @@ document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target===document
 (function midiSetup(){
 if(!navigator.requestMIDIAccess){if(document.body.dataset.pg==='midi')setPage('play');return}
 /* BeatStep factory CCs: top row of knobs, then bottom row. Pads 1-8 send notes 44-51, pads 9-16 send 36-43. */
-const BS_TOP=[7,74,71,76,77,93,73,75],BS_BOT=[114,18,19,16,17,91,79,72];
+const BS_TOP=[10,74,71,76,77,93,73,75],BS_BOT=[114,18,19,16,17,91,79,72];
 const FEEL=['bpm','swing','hum','varA','varB','ghost','clickVol','vol'];
 const BTN_IDS=['play','zeroBtn','bdn','bup','tabA','tabB','playA','playB'];
 const BTN_NAMES={play:'Start / stop',zeroBtn:'Straight',bdn:'Tempo −',bup:'Tempo +',tabA:'Edit groove',tabB:'Edit solo',playA:'Groove on/off',playB:'Solo on/off'};
-const defMap=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'lv_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:FEEL[i]}});m['cc:1']={t:'rowsel'};return m};
-const map808=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'tune_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'dec_'+ROWS[i].id}});m['cc:1']={t:'rowsel'};return m};
+const defMap=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'lv_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:FEEL[i]}});m['cc:1']={t:'rowsel'};m['cc:7']={t:'rowsel'};return m};
+const map808=()=>{const m={};BS_TOP.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'tune_'+ROWS[i].id}});BS_BOT.forEach((cc,i)=>{m['cc:'+cc]={t:'range',id:'dec_'+ROWS[i].id}});m['cc:1']={t:'rowsel'};m['cc:7']={t:'rowsel'};return m};
 const MK='4trade_midi';
 let cfg={on:false,map:defMap(),rel:false,pads:'steps',row:6,leds:true};
 try{const s=JSON.parse(localStorage.getItem(MK));if(s&&typeof s==='object')cfg={...cfg,...s,map:s.map&&typeof s.map==='object'?s.map:defMap()}}catch(e){}
 cfg.row=Math.max(0,Math.min(ROWS.length-1,cfg.row|0));
+if(cfg.map['cc:7']&&cfg.map['cc:7'].t==='range'&&/^(lv|tune)_kick$/.test(cfg.map['cc:7'].id)&&!cfg.map['cc:10']){cfg.map['cc:10']=cfg.map['cc:7'];cfg.map['cc:7']={t:'rowsel'}}
+if(cfg.rel===false)delete cfg.rel;
 const persist=()=>{try{localStorage.setItem(MK,JSON.stringify(cfg))}catch(e){}};
 let access=null,inputs=[],learn=false,learnTgt=null;const acc={};
 let outs=[],ledCh=0,ledHead=-1;let sent=Array(16).fill(null);
@@ -1934,7 +1936,7 @@ sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><sp
   <button type="button" class="keyb" data-v="on" role="radio"><span class="kl"></span><span class="kt">On</span></button>
   <button type="button" class="keyb" data-v="off" role="radio"><span class="kl"></span><span class="kt">Off</span></button></div></div>
  <div class="ctl"><span class="lbl">Knobs send</span><div class="keys" id="midiRel" role="radiogroup" aria-label="How the knobs send their values">
-  <button type="button" class="keyb" data-v="abs" role="radio"><span class="kl"></span><span class="kt">Absolute</span></button>
+  <button type="button" class="keyb" data-v="abs" role="radio"><span class="kl"></span><span class="kt">Auto</span></button>
   <button type="button" class="keyb" data-v="rel" role="radio"><span class="kl"></span><span class="kt">Relative</span></button></div></div>
  <div class="ctl rowpick"><span class="lbl">Pads edit this row</span>
   <div class="krow loopsel"><button class="kstep" id="mRowPrev" type="button" aria-label="Previous row">◀</button><button class="ksel" id="mRowSel" type="button" data-learn="rowsel" aria-label="Row the pads edit"><span class="ks" id="mRowName"></span><span class="kc" id="mRowInfo"></span></button><button class="kstep" id="mRowNext" type="button" aria-label="Next row">▶</button></div></div>
@@ -1942,16 +1944,18 @@ sec.innerHTML=`<div class="bankhead"><span class="lbl">MIDI controller</span><sp
 <div class="bsmap"><span class="lbl">Knobs</span><div class="bsk" id="bsKnobs"></div></div>
 <div class="bsmap"><span class="lbl" id="bsPadsLbl">Pads</span><div class="bsp" id="bsPads"></div></div>
 <div class="midimap" id="midiExtra"></div>
-<div class="bsmap"><span class="lbl">Last notes in</span><div class="libmsg midimon" id="midiMon">None yet.</div></div>
+<div class="bsmap"><span class="lbl">Last MIDI in</span><div class="libmsg midimon" id="midiMon">None yet.</div></div>
 <div class="edit"><button class="btn ledbtn" id="midiLearn" type="button" aria-pressed="false">MIDI learn</button><button class="btn" id="midiReset" type="button">BeatStep layout</button><button class="btn" id="midi808" type="button">808 knobs</button></div>`;
 document.querySelector('.helppg').before(sec);
-{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with ◀ ▶ or by tapping an instrument name. In Play sounds mode, pads 1 to 9 play the kit live. With Pad lights on, the BeatStep’s pads light up to match the steps on that row, and a light runs across them as the groove plays. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h);const h2=document.createElement('p');h2.className='hint';h2.textContent='808: tap 808 kit on the Samples page and every row becomes a TR-808 voice, synthesized the way the original circuits make it. Each row’s ◀ ▶ also has the cowbell, rimshot, cymbal, toms and the other congas. Tune and Decay for every voice are on the Mixer page; they also work on samples. On the MIDI page, 808 knobs puts tune on the BeatStep’s top row and decay on the bottom row; BeatStep layout puts levels and feel back. Set the pads to Play sounds to play the 808 live.';document.querySelector('.helppg').append(h2)}
+{const h=document.createElement('p');h.className='hint';h.textContent='MIDI: plug in a USB controller, open the MIDI page and tap Connect (Chrome, Edge or Firefox; iPhone and iPad browsers don’t support MIDI). A BeatStep works with no setup: the top row of knobs sets the instrument levels, the bottom row runs tempo, swing, humanize, groove vary, solo vary, ghost level, click level and volume, and Play and Stop run the groove. In Steps mode the 16 pads turn steps on and off on one row; hit a pad softly for a ghost note. Pick the row with the BeatStep’s big knob, with ◀ ▶, or by tapping an instrument name. Knobs never jump: each one moves its control from wherever it already is. For knobs that turn forever, set the BeatStep’s encoders to Relative #1 in Arturia’s MIDI Control Center; 4TRADE notices on its own. In Play sounds mode, pads 1 to 9 play the kit live. With Pad lights on, the BeatStep’s pads light up to match the steps on that row, and a light runs across them as the groove plays. MIDI learn links any knob or button here to any control: tap MIDI learn, tap the 4TRADE control, then move the hardware control.';document.querySelector('.helppg').append(h);const h2=document.createElement('p');h2.className='hint';h2.textContent='808: tap 808 kit on the Samples page and every row becomes a TR-808 voice, synthesized the way the original circuits make it. Each row’s ◀ ▶ also has the cowbell, rimshot, cymbal, toms and the other congas. Tune and Decay for every voice are on the Mixer page; they also work on samples. On the MIDI page, 808 knobs puts tune on the BeatStep’s top row and decay on the bottom row; BeatStep layout puts levels and feel back. Set the pads to Play sounds to play the 808 live.';document.querySelector('.helppg').append(h2)}
 const tab=document.createElement('button');tab.type='button';tab.className='pgtab';tab.dataset.pg='midi';tab.textContent='MIDI';tab.onclick=()=>setPage('midi');
 {const hp=document.querySelector('.pgtab[data-pg="help"]');hp?hp.before(tab):document.querySelector('.pgtabs').append(tab);tab.parentElement.classList.add('hasmidi')}
 const learnBar=document.createElement('div');learnBar.className='learnbar';learnBar.hidden=true;learnBar.setAttribute('role','status');
 learnBar.innerHTML='<span id="learnTxt"></span><button class="btn" id="learnDone" type="button">Done</button>';document.body.append(learnBar);
 
 const msg=t=>{$('midiMsg').textContent=t};
+let monT=0;function monCC(port,d){const now=performance.now(),m=cfg.map['cc:'+d[1]];const line=`${cname('cc:'+d[1])} (CC ${d[1]}) = ${d[2]}${m?' → '+tname(m):' — not linked'}`;
+  if(monLog[0]&&monLog[0].startsWith(cname('cc:'+d[1])+' (CC '+d[1]+')'))monLog[0]=line;else{monLog.unshift(line);monLog.length=Math.min(monLog.length,6)}if(now-monT>60){monT=now;const el=$('midiMon');if(el)el.textContent=monLog.join('\n')}}
 const monLog=[];function mon(port,d,note){const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'],n=d[1];
   monLog.unshift(`${NN[n%12]}${Math.floor(n/12)-2} (${n}) vel ${d[2]} ch ${(d[0]&15)+1}${port?' from '+port:''}${note?' — '+note:''}`);monLog.length=Math.min(monLog.length,6);
   const el=$('midiMon');if(el)el.textContent=monLog.join('\n')}
@@ -1961,7 +1965,7 @@ function tname(m){if(!m)return'—';if(m.t==='rowsel')return'Pads edit row';if(m
   const id=m.id||'';const r=ROWS.find(x=>['lv_','pan_','tune_','dec_'].some(p=>id===p+x.id));if(r)return r.name+' '+{lv:'level',pan:'pan',tune:'tune',dec:'decay'}[id.split('_')[0]];
   const l=document.querySelector(`label[for="${id}"]`);return l?(l.firstChild?l.firstChild.textContent:l.textContent).trim():id}
 function cname(key){const [k,v]=key.split(':'),n=+v;
-  if(k==='cc'){const a=BS_TOP.indexOf(n),b=BS_BOT.indexOf(n);return a>=0?'Knob '+(a+1):b>=0?'Knob '+(b+9):n===1?'CC 1 (big knob, once it’s set to CC 1)':'CC '+n}
+  if(k==='cc'){const a=BS_TOP.indexOf(n),b=BS_BOT.indexOf(n);return a>=0?'Knob '+(a+1):b>=0?'Knob '+(b+9):n===7?'Big knob':n===1?'CC 1':'CC '+n}
   const p=padIndex(n);return p>=0?'Pad '+(p+1):'Note '+n}
 const same=(a,b)=>a.t===b.t&&(a.id||'')===(b.id||'');
 
@@ -2004,7 +2008,7 @@ function onMsg(e,src){const d=e.data;if(!d||!d.length)return;const s=d[0];const 
   if((type===0x90||type===0x80)&&(VIRT.test(port)||isEcho(d))){mon(port,d,'ignored (echo of pad lights)');return}
   if(type===0x90&&d[2]>0){if(padIndex(d[1])>=0)ledCh=ch;mon(port,d,'');onNote(d[1],d[2],ch)}
   else if(type===0x80||type===0x90){const p=padIndex(d[1]);if(p>=0){sent[p]=null;setTimeout(ledSync,15)}}
-  else if(type===0xB0)onCC(d[1],d[2])}
+  else if(type===0xB0){monCC(port,d);onCC(d[1],d[2])}}
 /* ---- pad lights: lit = steps that are on in the selected row; the playhead flips the current pad ---- */
 const padNote=p=>p<8?44+p:36+p-8;
 /* ports that hand our own messages straight back (macOS IAC, loopMIDI, DAW buses) must never get pad-light notes, or the lights come back in as pad hits */
@@ -2025,16 +2029,26 @@ function onNote(n,v,ch){const key='note:'+n;
 function onCC(n,v){const key='cc:'+n;
   if(learn&&learnTgt){assign(key,'cc');return}
   const m=cfg.map[key];if(m)act(m,v,key)}
+/* Knobs never jump. A relative encoder (BeatStep "Relative #1" sends 63/65, the big knob does by default) is detected by
+   repeated values; an absolute knob moves the control by how far it turned, starting from where the control already is. */
+const kst={'cc:7':{last:null,run:0,enc:'r64'}};   // the big knob is relative from the factory
+function knobDelta(key,v){const st=kst[key]||(kst[key]={last:null,run:0,enc:null});
+  st.run=st.last===v?st.run+1:0;
+  if(!cfg.rel&&st.enc&&(st.enc==='r64'?(v<40||v>88):(v>24&&v<104)))st.enc=null;   // it was an absolute knob after all
+  if(cfg.rel)st.enc='r64';else if(!st.enc&&st.run>=1){if(v>=56&&v<=72)st.enc='r64';else if(v<=8||v>=120)st.enc='r2c'}
+  let d=0;if(st.enc==='r64')d=v-64;else if(st.enc==='r2c')d=v<64?v:v-128;else if(st.last!=null)d=v-st.last;
+  st.last=v;return d}
 function act(m,v,key){
-  if(m.t==='range'){if(key)setRange(m.id,v)}
+  if(m.t==='range'){if(key)setRange(m.id,v,key)}
   else if(m.t==='rowsel'){if(!key)return selectRow(cfg.row+1);
-    if(cfg.rel){acc[key]=(acc[key]||0)+(v-64);while(acc[key]>=2){acc[key]-=2;if(cfg.row<ROWS.length-1)selectRow(cfg.row+1)}while(acc[key]<=-2){acc[key]+=2;if(cfg.row>0)selectRow(cfg.row-1)}}
-    else{const i=Math.min(ROWS.length-1,Math.floor(v*ROWS.length/128));if(i!==cfg.row)selectRow(i)}}
+    const d=knobDelta(key,v),en=kst[key].enc,per=en?1:4;acc[key]=(acc[key]||0)+Math.sign(d)*Math.min(Math.abs(d),en?1:99);
+    while(acc[key]>=per){acc[key]-=per;if(cfg.row<ROWS.length-1)selectRow(cfg.row+1)}while(acc[key]<=-per){acc[key]+=per;if(cfg.row>0)selectRow(cfg.row-1)}}
   else if(m.t==='btn'&&v>=64){if(m.id==='play'){playing?stop():transport(true)}else{const b=$(m.id);if(b)b.click()}}}
-function setRange(id,v){const inp=$(id);if(!inp)return;const mn=+inp.min,mx=+inp.max;let x;
-  if(cfg.rel){const d=v-64;if(!d)return;x=+inp.value+d*Math.max(1,Math.round((mx-mn)/128))}else x=mn+v/127*(mx-mn);
-  x=Math.max(mn,Math.min(mx,Math.round(x)));if(String(x)===inp.value)return;
-  inp.value=x;inp.dispatchEvent(new Event('input'));
+function setRange(id,v,key){const inp=$(id);if(!inp)return;const mn=+inp.min,mx=+inp.max,st=+inp.step||1;
+  const d=knobDelta(key,v);if(!d)return;const ks=kst[key];
+  if(ks.id!==id||ks.pos==null||Math.abs(ks.pos-+inp.value)>st)ks.pos=+inp.value;ks.id=id;   // follow the screen if it changed there
+  ks.pos=Math.max(mn,Math.min(mx,ks.pos+d*(mx-mn)/(ks.enc?64:127)));
+  const prev=inp.value;inp.value=ks.pos;if(inp.value===prev)return;inp.dispatchEvent(new Event('input'));
   const k=inp.closest('.kctl');if(k){k.classList.add('midihit');clearTimeout(k._mh);k._mh=setTimeout(()=>k.classList.remove('midihit'),180)}}
 function stepPad(k,v){const i=cfg.row,p=pats[editing];
   p[i][k]=p[i][k]?0:(v<=50?2:1);paintCell(i,k);cells[i][k].classList.remove('add','drop');save();
